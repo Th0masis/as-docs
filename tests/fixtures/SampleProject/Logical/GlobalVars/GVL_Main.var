@@ -1,0 +1,6 @@
+VAR_GLOBAL
+	(* GVL_Main *)
+	gMotorSpeed : REAL := 0.0;  (* Actual motor speed [rpm] *)
+	gFault      : BOOL;         (* System fault flag *)
+	gCycleCount : DINT := 0;    (* Total cycle counter *)
+END_VAR

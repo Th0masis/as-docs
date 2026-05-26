@@ -1,0 +1,7 @@
+VAR
+	State       : MotorStateEnum;
+	Config      : MotorConfigType;
+	StartCmd    : BOOL;
+	StopCmd     : BOOL;
+	TON_ramp    : TON;
+END_VAR

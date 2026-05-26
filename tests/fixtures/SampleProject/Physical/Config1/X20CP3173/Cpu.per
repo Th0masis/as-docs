@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <TaskConfiguration>
+    <Task Name="CyclicTask" TaskClass="cyclic" CycleTime="10ms" Priority="1">
+      <Property Source="MainProgram/Main.st" />
+    </Task>
+    <Task Name="InitTask" TaskClass="init" Priority="0">
+      <Property Source="MainProgram/Main.st" />
+    </Task>
+  </TaskConfiguration>
+</Configuration>
