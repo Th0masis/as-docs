@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "as-docs"
+version = "0.1.0"
+description = "Documentation generator for B&R Automation Studio projects"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+keywords = ["automation-studio", "b&r", "plc", "documentation", "mcp"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "click>=8.1",
+    "anthropic>=0.26",
+    "fastmcp>=0.4",
+    "jinja2>=3.1",
+    "gitpython>=3.1",
+    "watchdog>=4.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+as-docs = "as_docs.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["as_docs"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

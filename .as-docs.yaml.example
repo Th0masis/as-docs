@@ -1,0 +1,42 @@
+project:
+  name: "MyMachineProject"
+  as_version: "4.10"
+  root: "."                         # relative to this config file
+  language: "en"                    # documentation output language
+
+scanner:
+  active_configuration: "Config1"   # which Physical config to parse
+                                    # default: first found alphabetically
+  ignore_dirs:                      # always excluded from scanning
+    - Temp
+    - Binaries
+    - Diagnosis
+  scan_libraries: true              # scan Logical/Libraries/ for custom lib ST code
+  external_lib_prefixes:            # known precompiled prefixes → skip as external
+    - "Mp"
+    - "Mc"
+    - "ACP10"
+    - "Ar"
+
+ai:
+  enabled: true
+  model: "claude-sonnet-4-20250514"
+  cache_dir: ".as-docs-cache"       # gitignored
+
+server:
+  mode: "stdio"                     # stdio | http
+  port: 8765
+  host: "127.0.0.1"                 # use 0.0.0.0 for team-shared remote
+
+output:
+  docs_dir: "docs/as-docs"
+  formats:
+    - markdown
+    - json
+    - llms.txt
+  mermaid: true
+  default_level: 3
+
+git:
+  hook_enabled: false               # set true after as-docs install-hook
+  auto_level: 2                     # level to regenerate on commit
