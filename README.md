@@ -4,6 +4,12 @@ Documentation generation tool for **B&R Automation Studio (AS) projects** writte
 
 Parses AS project files, extracts structural and semantic information, optionally enriches with AI-generated descriptions, and outputs documentation in multiple formats — readable by both humans and AI agents.
 
+## Documentation Index
+
+- `README.md` — quick start, CLI commands, configuration, and current implementation status
+- `as-docs-architecture.md` — full architecture, data model, implementation phases, and decisions
+- `.as-docs.yaml.example` — complete configuration template with comments
+
 ## Features
 
 - **Level 1** — Project map: task list, call graph, global variables, data types (zero AI calls, instant)
