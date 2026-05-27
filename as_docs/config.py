@@ -28,7 +28,12 @@ class ScannerConfig:
 @dataclass
 class AIConfig:
     enabled: bool = True
-    model: str = "claude-sonnet-4-20250514"
+    provider: str = "copilot"
+    model: str = "gpt-4.1"
+    api_base_url: str = "https://models.inference.ai.azure.com/chat/completions"
+    api_key_env: str = "GITHUB_TOKEN"
+    timeout_seconds: int = 60
+    max_retries: int = 3
     cache_dir: str = ".as-docs-cache"
 
 
@@ -104,7 +109,35 @@ def load_config(config_file: Path | None = None) -> Config:
         if section in raw and isinstance(raw[section], dict):
             _merge(getattr(cfg, section), raw[section])
 
+    _validate_config(cfg)
+
     return cfg
+
+
+def _validate_config(cfg: Config) -> None:
+    provider = cfg.ai.provider.strip().lower()
+    allowed = {"copilot", "anthropic"}
+    if provider not in allowed:
+        raise ValueError(
+            f"Invalid ai.provider '{cfg.ai.provider}'. Allowed values: copilot, anthropic."
+        )
+
+    cfg.ai.provider = provider
+
+    if not cfg.ai.model.strip():
+        raise ValueError("Invalid ai.model: value must not be empty.")
+
+    if provider == "copilot":
+        if not cfg.ai.api_base_url.strip():
+            raise ValueError("Invalid ai.api_base_url: value must not be empty for copilot provider.")
+        if not cfg.ai.api_key_env.strip():
+            raise ValueError("Invalid ai.api_key_env: value must not be empty for copilot provider.")
+
+    if cfg.ai.timeout_seconds <= 0:
+        raise ValueError("Invalid ai.timeout_seconds: value must be greater than 0.")
+
+    if cfg.ai.max_retries < 0:
+        raise ValueError("Invalid ai.max_retries: value must be >= 0.")
 
 
 def _find_config(start: Path) -> Path | None:

@@ -76,7 +76,8 @@ def run_generate(
     # 5. AI enrichment (Level 2+)
     if ai_enabled and level >= 2:
         from as_docs.enricher.ai_enricher import enrich_graph
-        enrich_graph(graph, level=level, config=config)
+        ai_stats = enrich_graph(graph, level=level, config=config)
+        setattr(graph, "_ai_stats", ai_stats)
 
     # 6. Generate outputs
     output_dir = Path(config.output.docs_dir)
