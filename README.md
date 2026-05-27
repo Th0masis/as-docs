@@ -7,9 +7,10 @@ Parses AS project files, extracts structural and semantic information, optionall
 ## Features
 
 - **Level 1** — Project map: task list, call graph, global variables, data types (zero AI calls, instant)
-- **Level 2** — Task overviews: AI-generated task descriptions, cross-task data coupling
-- **Level 3** — POU detail: full per-block documentation with patterns, interfaces, cross-references
+- **Level 2** — Task enrichment pipeline: AI-generated task summaries stored in the knowledge graph and reused via cache
+- **Level 3** — POU enrichment pipeline: AI-generated POU descriptions, responsibilities, patterns, and notes stored in the knowledge graph
 - **Level 4** — Flow diagrams: parser-first behavioral Mermaid diagrams with AI enrichment
+- **AI cache** — Provider/model-separated cache for Level 2 and Level 3 enrichment
 - **MCP server** — FastMCP server for AI agent integration (Claude Code, VS Code Copilot)
 
 ## Installation
@@ -32,10 +33,13 @@ pip install -e .
 # In your AS project directory (or any subdirectory)
 as-docs init                    # detect project root, create .as-docs.yaml
 
+# Set token for Copilot/GitHub Models compatible endpoint
+$env:GITHUB_TOKEN = "<token>"
+
 # Generate Level 1 docs (no AI, instant)
 as-docs generate --no-ai
 
-# Generate full docs with AI descriptions (Level 3 default)
+# Generate docs with AI enrichment (Level 3 default)
 as-docs generate
 
 # Check freshness
@@ -47,8 +51,8 @@ as-docs status
 | Level | AI Calls | Time | Output |
 |-------|----------|------|--------|
 | 1 | 0 | seconds | overview, architecture, global vars, data types |
-| 2 | 1 per task | ~45s | task descriptions, data flow diagram |
-| 3 | 1 per POU | ~3min cold | full POU docs, complete knowledge graph |
+| 2 | 1 per task | ~45s | enriched task data in `knowledge_graph.json`, data flow diagram |
+| 3 | 1 per POU | ~3min cold | enriched POU data in `knowledge_graph.json`, complete knowledge graph |
 | 4 | 0–1 per POU | ~6min cold | behavioral flow diagrams |
 
 ## MCP Server
@@ -88,8 +92,35 @@ as-docs diff HEAD~1                       # changed POUs since commit
 
 Copy `.as-docs.yaml.example` to `.as-docs.yaml` in your AS project root and edit as needed.
 
+AI provider settings are under `ai:`:
+
+- `provider`: `copilot` is the active Phase 2 runtime provider; `anthropic` is reserved but not enabled in this branch
+- `model`: model name passed to the provider
+- `api_base_url`: chat-completions endpoint for provider calls
+- `api_key_env`: environment variable that stores the access token
+
+Example:
+
+```yaml
+ai:
+  enabled: true
+  provider: "copilot"
+  model: "gpt-4.1"
+  api_base_url: "https://models.inference.ai.azure.com/chat/completions"
+  api_key_env: "GITHUB_TOKEN"
+  timeout_seconds: 60
+  max_retries: 3
+  cache_dir: ".as-docs-cache"
+```
+
+## Current Phase 2 Status
+
+- Implemented: config validation, provider abstraction, copilot runtime client, prompt generation, Level 2/3 enrichment pipeline, cache, CLI visibility, mocked test coverage
+- Deferred: anthropic runtime client, provider override flag on CLI, Level 2/3 dedicated markdown page generation
+- Current enriched output target: `knowledge_graph.json`; Level 1 markdown files remain the primary human-readable output in this branch
+
 ## Requirements
 
 - Python 3.11+
 - B&R Automation Studio 4.x project
-- Anthropic API key (for Level 2+): set `ANTHROPIC_API_KEY` environment variable
+- GitHub token for the configured endpoint (default env var: `GITHUB_TOKEN`)

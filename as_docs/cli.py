@@ -84,7 +84,12 @@ scanner:
 
 ai:
   enabled: true
-  model: "claude-sonnet-4-20250514"
+    provider: "copilot"
+    model: "gpt-4.1"
+    api_base_url: "https://models.inference.ai.azure.com/chat/completions"
+    api_key_env: "GITHUB_TOKEN"
+    timeout_seconds: 60
+    max_retries: 3
   cache_dir: ".as-docs-cache"
 
 server:
@@ -122,14 +127,25 @@ def generate(level: int | None, no_ai: bool, config_path: str | None) -> None:
 
     click.echo(f"📖  Generating Level {effective_level} docs for '{cfg.project.name or 'project'}'...")
     if ai_enabled:
-        click.echo(f"🤖  AI enrichment enabled (model: {cfg.ai.model})")
+        click.echo(
+            f"🤖  AI enrichment enabled (provider: {cfg.ai.provider}, model: {cfg.ai.model})"
+        )
 
     try:
         graph = run_generate(cfg, level=effective_level, ai_enabled=ai_enabled)
         out = Path(cfg.output.docs_dir)
         click.echo(f"\n✅  Done — {len(graph.pous)} POUs, {len(graph.tasks)} tasks")
+        if ai_enabled:
+            stats = getattr(graph, "_ai_stats", None)
+            if stats is not None:
+                click.echo(
+                    f"📊  AI cache: hits={stats.hits}, misses={stats.misses}, writes={stats.writes}"
+                )
         click.echo(f"📁  Output: {out.resolve()}")
     except FileNotFoundError as e:
+        click.echo(f"❌  {e}", err=True)
+        sys.exit(1)
+    except RuntimeError as e:
         click.echo(f"❌  {e}", err=True)
         sys.exit(1)
 
@@ -149,8 +165,11 @@ def upgrade(to_level: int, pou: str | None, config_path: str | None) -> None:
     if not cfg.ai.enabled:
         click.echo("❌  AI is disabled in config. Set ai.enabled: true", err=True)
         sys.exit(1)
-    if "ANTHROPIC_API_KEY" not in os.environ:
-        click.echo("❌  ANTHROPIC_API_KEY environment variable not set.", err=True)
+    if cfg.ai.provider == "copilot" and cfg.ai.api_key_env not in os.environ:
+        click.echo(
+            f"❌  {cfg.ai.api_key_env} environment variable not set for copilot provider.",
+            err=True,
+        )
         sys.exit(1)
 
     scope = f"pou:{pou}" if pou else "all"
@@ -280,4 +299,7 @@ def diff(ref: str, config_path: str | None) -> None:
 
 def _load_cfg(config_path: str | None) -> Config:
     p = Path(config_path) if config_path else None
-    return load_config(p)
+    try:
+        return load_config(p)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
