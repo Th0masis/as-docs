@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
 from as_docs.config import AIConfig
 from as_docs.enricher.providers.base import EnrichmentPayload
+
+
+SYSTEM_INSTRUCTION = (
+    "You are a documentation assistant for B&R Automation Studio projects. "
+    "Return strict JSON only with keys: description, responsibilities, patterns, notes."
+)
 
 
 class CopilotProvider:
@@ -28,31 +33,14 @@ class CopilotProvider:
         return self._request(prompt=prompt, model=model, max_tokens=max_tokens)
 
     def _request(self, prompt: str, model: str, max_tokens: int) -> EnrichmentPayload:
-        payload = {
-            "model": model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a documentation assistant for B&R Automation Studio projects. "
-                        "Return strict JSON only with keys: description, responsibilities, patterns, notes."
-                    ),
-                },
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": 0.2,
-            "max_tokens": max_tokens,
-        }
-
         max_attempts = self._cfg.max_retries + 1
         for attempt in range(1, max_attempts + 1):
             try:
-                body = self._post_json(payload)
-                content = _extract_content_text(body)
+                content = self._send_with_sdk(prompt=prompt, model=model, max_tokens=max_tokens)
                 raw_json = _extract_json_block(content)
                 parsed = json.loads(raw_json)
                 return _normalize_payload(parsed)
-            except (HTTPError, URLError, TimeoutError) as exc:
+            except (RuntimeError, TimeoutError) as exc:
                 if attempt >= max_attempts:
                     raise RuntimeError(f"Copilot provider request failed: {exc}") from exc
                 time.sleep(0.4 * attempt)
@@ -61,34 +49,84 @@ class CopilotProvider:
 
         raise RuntimeError("Copilot provider request failed after retries.")
 
-    def _post_json(self, payload: dict[str, Any]) -> dict[str, Any]:
-        encoded = json.dumps(payload).encode("utf-8")
-        req = Request(
-            self._cfg.api_base_url,
-            data=encoded,
-            headers={
-                "Authorization": f"Bearer {self._token}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
-        with urlopen(req, timeout=self._cfg.timeout_seconds) as resp:
-            text = resp.read().decode("utf-8", errors="replace")
-            return json.loads(text)
+    def _send_with_sdk(self, prompt: str, model: str, max_tokens: int) -> str:
+        try:
+            return asyncio.run(self._send_with_sdk_async(prompt=prompt, model=model, max_tokens=max_tokens))
+        except RuntimeError as exc:
+            if "asyncio.run() cannot be called" not in str(exc):
+                raise
+            loop = asyncio.new_event_loop()
+            try:
+                return loop.run_until_complete(
+                    self._send_with_sdk_async(prompt=prompt, model=model, max_tokens=max_tokens)
+                )
+            finally:
+                loop.close()
 
+    async def _send_with_sdk_async(self, prompt: str, model: str, max_tokens: int) -> str:
+        try:
+            from copilot import CopilotClient
+            from copilot.session import PermissionHandler
+            from copilot.session_events import AssistantMessageData
+        except Exception as exc:  # pragma: no cover - exercised when dependency is missing
+            raise RuntimeError(
+                "Copilot SDK is not installed. Install package 'github-copilot-sdk'."
+            ) from exc
 
-def _extract_content_text(response_json: dict[str, Any]) -> str:
-    choices = response_json.get("choices")
-    if not isinstance(choices, list) or not choices:
-        raise RuntimeError("Copilot provider response has no choices.")
-    msg = choices[0].get("message", {})
-    content = msg.get("content", "")
-    if isinstance(content, list):
-        chunks = [item.get("text", "") for item in content if isinstance(item, dict)]
-        return "".join(chunks)
-    if isinstance(content, str):
-        return content
-    raise RuntimeError("Copilot provider response content is in an unsupported format.")
+        client = CopilotClient()
+        await client.start()
+
+        session = None
+        try:
+            session_kwargs: dict[str, Any] = {
+                "on_permission_request": PermissionHandler.approve_all,
+                "model": model,
+                "github_token": self._token,
+            }
+
+            # Backward compatibility: if a custom provider endpoint is configured,
+            # route requests through SDK provider config instead of default Copilot routing.
+            if self._cfg.api_base_url.strip():
+                session_kwargs["provider"] = {
+                    "type": "openai",
+                    "base_url": self._cfg.api_base_url,
+                    "bearer_token": self._token,
+                    "wire_api": "completions",
+                    "max_output_tokens": max_tokens,
+                }
+
+            session = await client.create_session(**session_kwargs)
+            full_prompt = f"{SYSTEM_INSTRUCTION}\n\n{prompt}"
+            reply = await session.send_and_wait(
+                full_prompt,
+                timeout=float(self._cfg.timeout_seconds),
+            )
+
+            if reply is None or getattr(reply, "data", None) is None:
+                raise RuntimeError("Copilot SDK returned no assistant message.")
+
+            data = reply.data
+            if isinstance(data, AssistantMessageData):
+                content = data.content or ""
+            else:
+                content = str(getattr(data, "content", "") or "")
+
+            if not content.strip():
+                raise RuntimeError("Copilot SDK returned an empty assistant message.")
+
+            return content
+        finally:
+            if session is not None:
+                try:
+                    await session.disconnect()
+                except Exception:
+                    pass
+            try:
+                await client.stop()
+            except Exception:
+                force_stop = getattr(client, "force_stop", None)
+                if callable(force_stop):
+                    await force_stop()
 
 
 def _extract_json_block(text: str) -> str:

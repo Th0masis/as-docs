@@ -43,7 +43,7 @@ ai:
         load_config(cfg_file)
 
 
-def test_copilot_requires_api_base_url(tmp_path: Path) -> None:
+def test_copilot_requires_api_key_env(tmp_path: Path) -> None:
     cfg_file = tmp_path / ".as-docs.yaml"
     _write_cfg(
         cfg_file,
@@ -51,9 +51,9 @@ def test_copilot_requires_api_base_url(tmp_path: Path) -> None:
 ai:
   provider: "copilot"
   model: "gpt-4.1"
-  api_base_url: ""
+  api_key_env: ""
 """,
     )
 
-    with pytest.raises(ValueError, match="ai.api_base_url"):
+    with pytest.raises(ValueError, match="ai.api_key_env"):
         load_config(cfg_file)

@@ -30,7 +30,7 @@ class AIConfig:
     enabled: bool = True
     provider: str = "copilot"
     model: str = "gpt-4.1"
-    api_base_url: str = "https://models.inference.ai.azure.com/chat/completions"
+    api_base_url: str = ""
     api_key_env: str = "GITHUB_TOKEN"
     timeout_seconds: int = 60
     max_retries: int = 3
@@ -127,11 +127,8 @@ def _validate_config(cfg: Config) -> None:
     if not cfg.ai.model.strip():
         raise ValueError("Invalid ai.model: value must not be empty.")
 
-    if provider == "copilot":
-        if not cfg.ai.api_base_url.strip():
-            raise ValueError("Invalid ai.api_base_url: value must not be empty for copilot provider.")
-        if not cfg.ai.api_key_env.strip():
-            raise ValueError("Invalid ai.api_key_env: value must not be empty for copilot provider.")
+    if provider == "copilot" and not cfg.ai.api_key_env.strip():
+        raise ValueError("Invalid ai.api_key_env: value must not be empty for copilot provider.")
 
     if cfg.ai.timeout_seconds <= 0:
         raise ValueError("Invalid ai.timeout_seconds: value must be greater than 0.")

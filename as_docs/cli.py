@@ -86,7 +86,7 @@ ai:
   enabled: true
     provider: "copilot"
     model: "gpt-4.1"
-    api_base_url: "https://models.inference.ai.azure.com/chat/completions"
+    api_base_url: ""
     api_key_env: "GITHUB_TOKEN"
     timeout_seconds: 60
     max_retries: 3

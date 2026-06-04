@@ -101,8 +101,8 @@ Copy `.as-docs.yaml.example` to `.as-docs.yaml` in your AS project root and edit
 AI provider settings are under `ai:`:
 
 - `provider`: `copilot` is the active Phase 2 runtime provider; `anthropic` is reserved but not enabled in this branch
-- `model`: model name passed to the provider
-- `api_base_url`: chat-completions endpoint for provider calls
+- `model`: model name passed to the Copilot SDK session
+- `api_base_url`: optional custom OpenAI/Azure endpoint (BYOK) passed through Copilot SDK provider config
 - `api_key_env`: environment variable that stores the access token
 
 Example:
@@ -112,12 +112,36 @@ ai:
   enabled: true
   provider: "copilot"
   model: "gpt-4.1"
-  api_base_url: "https://models.inference.ai.azure.com/chat/completions"
+  api_base_url: ""
   api_key_env: "GITHUB_TOKEN"
   timeout_seconds: 60
   max_retries: 3
   cache_dir: ".as-docs-cache"
 ```
+
+## AI Generation and Enrichment (Copilot SDK Aligned)
+
+This project performs AI enrichment through the Copilot SDK session API and normalizes strict JSON into the knowledge graph.
+
+After reviewing `github/copilot-sdk`, the recommended mental model for generation and enrichment is:
+
+- **Session-based generation**: create a session with an explicit model (for example `gpt-5`/`gpt-4.1`) and stream or wait for completion
+- **Tool-augmented enrichment**: expose analyzers/retrievers as tools so the model can fetch only the context it needs
+- **MCP-first integrations**: attach local/remote MCP servers and scope allowed tools (`["*"]`, specific names, or `[]`)
+- **Hooked post-processing**: use pre/post tool hooks to inject extra context, modify results, or suppress noisy output before final enrichment text is applied
+- **Agent specialization**: separate read-only analysis from write/update actions using custom agents with scoped tool sets
+
+How this maps to `as-docs` today:
+
+- **Implemented now**: direct Copilot SDK session runtime, deterministic enrichment prompts, provider/model-aware cache keys, strict JSON normalization, and enrichment write-back into `knowledge_graph.json`
+- **Optional compatibility mode**: set `ai.api_base_url` to route through a custom OpenAI/Azure endpoint via Copilot SDK provider config
+
+Suggested operational pattern for reliable enrichment quality:
+
+1. Keep Level 2/3 prompts schema-first (JSON contract first, prose second).
+2. Use small, task/POU-specific prompts to reduce hallucinated cross-module assumptions.
+3. Treat cache as provider+model scoped (already implemented) to avoid cross-model contamination.
+4. Re-run enrichment only for changed POUs/tasks (`as-docs diff` + targeted cache clear) to keep costs and drift low.
 
 ## Current Phase 2 Status
 
