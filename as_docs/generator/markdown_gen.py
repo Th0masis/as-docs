@@ -19,6 +19,10 @@ def generate_all_markdown(graph: KnowledgeGraph, output_dir: Path) -> list[Path]
 
     if graph.level >= 2:
         produced.append(_write_data_flow(graph, output_dir))
+        produced.extend(_write_task_pages(graph, output_dir))
+
+    if graph.level >= 3:
+        produced.extend(_write_pou_pages(graph, output_dir))
 
     return produced
 
@@ -231,3 +235,165 @@ def _write_data_flow(graph: KnowledgeGraph, output_dir: Path) -> Path:
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
+
+
+# ---------------------------------------------------------------------------
+# tasks/*.md  (Level 2+)
+# ---------------------------------------------------------------------------
+
+def _write_task_pages(graph: KnowledgeGraph, output_dir: Path) -> list[Path]:
+    tasks_dir = output_dir / "tasks"
+    tasks_dir.mkdir(parents=True, exist_ok=True)
+    produced: list[Path] = []
+
+    for task_name, task in sorted(graph.tasks.items()):
+        reads, writes = _task_rw_vars(graph, task.programs)
+        coupling = _task_coupling(graph, task_name, set(reads) | set(writes))
+
+        path = tasks_dir / f"{task_name}.md"
+        lines = [
+            f"# Task: {task_name}",
+            "",
+            "| Field | Value |",
+            "|---|---|",
+            f"| Type | {task.task_type} |",
+            f"| Interval | {f'{task.cycle_time_ms} ms' if task.cycle_time_ms else '—'} |",
+            f"| Programs | {', '.join(task.programs) if task.programs else '—'} |",
+            "",
+        ]
+
+        if task.description:
+            lines += ["## Description", "", task.description, ""]
+
+        if task.responsibilities:
+            lines += ["## Responsibilities", ""]
+            lines.extend([f"- {item}" for item in task.responsibilities])
+            lines.append("")
+
+        lines += [
+            "## Global Variable Access",
+            "",
+            f"- Reads: {', '.join(reads) if reads else '—'}",
+            f"- Writes: {', '.join(writes) if writes else '—'}",
+            f"- Coupled tasks: {', '.join(coupling) if coupling else '—'}",
+            "",
+        ]
+
+        path.write_text("\n".join(lines), encoding="utf-8")
+        produced.append(path)
+
+    return produced
+
+
+def _task_rw_vars(graph: KnowledgeGraph, programs: list[str]) -> tuple[list[str], list[str]]:
+    closure = _task_pou_closure(graph, programs)
+    reads = sorted(
+        e.target
+        for e in graph.edges
+        if e.edge_type == "READS" and e.source in closure and e.target in graph.global_vars
+    )
+    writes = sorted(
+        e.target
+        for e in graph.edges
+        if e.edge_type == "WRITES" and e.source in closure and e.target in graph.global_vars
+    )
+    return reads, writes
+
+
+def _task_pou_closure(graph: KnowledgeGraph, programs: list[str]) -> set[str]:
+    closure = set(programs)
+    queue = list(programs)
+    while queue:
+        current = queue.pop(0)
+        callees = [
+            e.target for e in graph.edges if e.edge_type == "CALLS" and e.source == current
+        ]
+        for callee in callees:
+            if callee not in closure:
+                closure.add(callee)
+                queue.append(callee)
+    return closure
+
+
+def _task_coupling(graph: KnowledgeGraph, task_name: str, var_set: set[str]) -> list[str]:
+    coupled: list[str] = []
+    for other_name, other in sorted(graph.tasks.items()):
+        if other_name == task_name:
+            continue
+        other_reads, other_writes = _task_rw_vars(graph, other.programs)
+        if var_set.intersection(other_reads) or var_set.intersection(other_writes):
+            coupled.append(other_name)
+    return coupled
+
+
+# ---------------------------------------------------------------------------
+# pou/*.md  (Level 3+)
+# ---------------------------------------------------------------------------
+
+def _write_pou_pages(graph: KnowledgeGraph, output_dir: Path) -> list[Path]:
+    pou_dir = output_dir / "pou"
+    pou_dir.mkdir(parents=True, exist_ok=True)
+    produced: list[Path] = []
+
+    for pou_name, pou in sorted(graph.pous.items()):
+        if pou.is_external_library:
+            continue
+
+        callers = sorted(
+            e.source for e in graph.edges if e.edge_type == "CALLS" and e.target == pou_name
+        )
+        callees = sorted(
+            e.target for e in graph.edges if e.edge_type == "CALLS" and e.source == pou_name
+        )
+        reads = sorted(
+            e.target
+            for e in graph.edges
+            if e.edge_type == "READS" and e.source == pou_name and e.target in graph.global_vars
+        )
+        writes = sorted(
+            e.target
+            for e in graph.edges
+            if e.edge_type == "WRITES" and e.source == pou_name and e.target in graph.global_vars
+        )
+
+        path = pou_dir / f"{pou_name}.md"
+        lines = [
+            f"# POU: {pou_name}",
+            "",
+            "| Field | Value |",
+            "|---|---|",
+            f"| Type | {pou.pou_type} |",
+            f"| Source | {pou.source_file} |",
+            "",
+        ]
+
+        if pou.description:
+            lines += ["## Description", "", pou.description, ""]
+
+        if pou.responsibilities:
+            lines += ["## Responsibilities", ""]
+            lines.extend([f"- {item}" for item in pou.responsibilities])
+            lines.append("")
+
+        if pou.patterns:
+            lines += ["## Patterns", ""]
+            lines.extend([f"- {item}" for item in pou.patterns])
+            lines.append("")
+
+        if pou.notes:
+            lines += ["## Notes", "", pou.notes, ""]
+
+        lines += [
+            "## Relationships",
+            "",
+            f"- Callers: {', '.join(callers) if callers else '—'}",
+            f"- Callees: {', '.join(callees) if callees else '—'}",
+            f"- Reads: {', '.join(reads) if reads else '—'}",
+            f"- Writes: {', '.join(writes) if writes else '—'}",
+            "",
+        ]
+
+        path.write_text("\n".join(lines), encoding="utf-8")
+        produced.append(path)
+
+    return produced

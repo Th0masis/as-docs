@@ -3,6 +3,8 @@ from __future__ import annotations
 import pytest
 
 from as_docs.config import Config
+from as_docs.enricher.providers.anthropic_client import _normalize_payload as anthropic_normalize
+from as_docs.enricher.providers.copilot_client import _normalize_payload as copilot_normalize
 from as_docs.enricher.providers.factory import create_provider
 
 
@@ -39,3 +41,35 @@ def test_factory_rejects_unknown_provider() -> None:
 
     with pytest.raises(RuntimeError, match="Unsupported ai.provider"):
         create_provider(cfg)
+
+
+def test_provider_normalization_contract_parity() -> None:
+    raw = {
+        "description": "  Handles motor state transitions. ",
+        "responsibilities": [" Read inputs ", "Update outputs", ""],
+        "patterns": [" state machine ", ""],
+        "notes": "  Uses TON for debounce.  ",
+    }
+
+    copilot_payload = copilot_normalize(raw)
+    anthropic_payload = anthropic_normalize(raw)
+
+    assert copilot_payload.description == anthropic_payload.description
+    assert copilot_payload.responsibilities == anthropic_payload.responsibilities
+    assert copilot_payload.patterns == anthropic_payload.patterns
+    assert copilot_payload.notes == anthropic_payload.notes
+
+
+def test_provider_normalization_contract_parity_with_non_list_patterns() -> None:
+    raw = {
+        "description": "Task summary",
+        "responsibilities": ["One"],
+        "patterns": "not-a-list",
+        "notes": "",
+    }
+
+    copilot_payload = copilot_normalize(raw)
+    anthropic_payload = anthropic_normalize(raw)
+
+    assert copilot_payload.patterns == []
+    assert anthropic_payload.patterns == []

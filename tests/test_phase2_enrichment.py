@@ -4,6 +4,7 @@ from pathlib import Path
 
 from as_docs.config import Config
 from as_docs.enricher.ai_enricher import enrich_graph
+from as_docs.engine import run_generate
 from as_docs.model.graph import Edge, KnowledgeGraph, POUNode, TaskConfig, Variable
 
 
@@ -123,3 +124,24 @@ def test_enrichment_uses_cache_on_second_run(monkeypatch, tmp_path: Path) -> Non
     assert second.hits == 2
     assert provider.task_calls == 1
     assert provider.pou_calls == 1
+
+
+def test_level3_generates_task_and_pou_markdown(monkeypatch, tmp_path: Path) -> None:
+    fixture = Path(__file__).parent / "fixtures" / "SampleProject"
+
+    provider = DummyProvider()
+    monkeypatch.setattr("as_docs.enricher.ai_enricher.create_provider", lambda _cfg: provider)
+
+    cfg = Config()
+    cfg.project.name = "SampleProject"
+    cfg.scanner.active_configuration = "Config1"
+    cfg.output.docs_dir = str(tmp_path / "docs")
+    cfg.ai.cache_dir = str(tmp_path / ".cache")
+    cfg.ai.provider = "copilot"
+    cfg.ai.model = "gpt-4.1"
+
+    graph = run_generate(cfg, level=3, ai_enabled=True, project_root=fixture)
+
+    assert graph.level == 3
+    assert (tmp_path / "docs" / "tasks" / "CyclicTask.md").exists()
+    assert (tmp_path / "docs" / "pou" / "MainProgram.md").exists()

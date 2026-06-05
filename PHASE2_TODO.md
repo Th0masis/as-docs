@@ -27,7 +27,7 @@ Current implementation scope in this branch:
 - [x] Create provider interface (single request contract for task and POU prompts).
 - [x] Implement Anthropic client using existing SDK path.
 - [x] Implement Copilot-backed client path for analyzer calls.
-- [ ] Ensure both providers return the same normalized response schema.
+- [x] Ensure both providers return the same normalized response schema.
 - [x] Add deterministic retry/backoff and timeout handling.
 
 ## 4) Caching
@@ -46,7 +46,7 @@ Current implementation scope in this branch:
 
 ## 6) Tests
 
-- [ ] Unit tests for config validation (`anthropic` and `copilot` providers).
+- [x] Unit tests for config validation (`anthropic` and `copilot` providers).
 - [x] Unit tests for response parsing and schema guardrails.
 - [x] Unit tests for cache key behavior including provider/model.
 - [x] Integration-style tests with mocked provider clients for Level 2 and Level 3.
@@ -61,5 +61,4 @@ Current implementation scope in this branch:
 
 ## Remaining Gaps
 
-- Cross-provider contract parity tests are still deferred.
-- Dedicated task and POU markdown pages are still deferred.
+- None for Phase 2 scope.
