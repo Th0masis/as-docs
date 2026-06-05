@@ -180,11 +180,14 @@ The raw token is **never stored on the provider object** — the Copilot SDK aut
 
 Anthropic provider reads the key from `ai.api_key_env` (for example `ANTHROPIC_API_KEY`) and initializes the Anthropic SDK directly.
 
-## Current Phase 2 Status
+## Current Phase 3 Status
 
-- Implemented: config validation, provider abstraction, copilot runtime client (auto-auth + entitlement check), anthropic runtime fallback client, prompt generation, Level 2/3 enrichment pipeline, cache, CLI visibility, mocked test coverage
-- Deferred: provider override flag on CLI, Level 2/3 dedicated markdown page generation, cross-provider contract parity tests
-- Current enriched output target: `knowledge_graph.json`; Level 1 markdown files remain the primary human-readable output in this branch
+- Implemented: FastMCP server with stdio and HTTP transports (`as-docs serve`, `as-docs serve --http --port 8765`)
+- Implemented read tools: `get_overview`, `get_pou_list`, `get_pou`, `get_task`, `find_variable`, `get_data_flow`, `get_call_graph`, `get_global_vars`, `search`, `get_flow_diagram`
+- Implemented action tools: `regenerate`, `get_cache_status`, `upgrade`
+- Implemented level-aware MCP responses with `status: partial`, `available_level`, `requested_level`, and upgrade hints when a higher level is required
+- Implemented MCP payload + behavior tests for Phase 3 (`tests/test_phase3_mcp_server.py`)
+- Current limitation: scoped `regenerate` (`changed`, `pou:NAME`) and `upgrade --pou` routes are exposed but currently execute full regeneration with an explicit warning until true scoped execution is added
 
 ## Requirements
 
