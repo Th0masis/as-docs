@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import subprocess
 import time
@@ -20,6 +21,7 @@ SYSTEM_INSTRUCTION = (
 
 _GH_API = "https://api.github.com"
 _COPILOT_TOKEN_URL = f"{_GH_API}/copilot_internal/v2/token"
+_LOG = logging.getLogger(__name__)
 
 
 def _resolve_github_token(api_key_env: str = "GITHUB_TOKEN") -> str | None:
@@ -99,14 +101,21 @@ class CopilotProvider:
     def __init__(self, ai_config: AIConfig) -> None:
         self._cfg = ai_config
         token = _resolve_github_token(ai_config.api_key_env)
-        if not token:
-            raise RuntimeError(
-                "No GitHub authentication found. "
-                "Sign in to GitHub in VS Code, install the GitHub CLI and run "
-                "'gh auth login', or set the GITHUB_TOKEN environment variable."
+        self._github_login = "<unknown>"
+
+        # SDK auth can use the current VS Code session without explicit tokens.
+        # Token-based GitHub preflight is best-effort only and must not block.
+        if token:
+            try:
+                self._github_login = _verify_copilot_entitlement(token)
+            except Exception as exc:
+                _LOG.warning("Copilot preflight check failed; continuing with SDK auth: %s", exc)
+        else:
+            _LOG.info(
+                "No explicit GitHub token found for preflight. "
+                "Proceeding with Copilot SDK session-based auth."
             )
-        login = _verify_copilot_entitlement(token)
-        self._github_login = login
+
         # Do NOT store the raw token — the Copilot SDK auto-discovers
         # VS Code credentials at runtime.
 

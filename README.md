@@ -166,7 +166,7 @@ Suggested operational pattern for reliable enrichment quality:
 
 ## Authentication
 
-Copilot provider resolves a GitHub token automatically from the first available source:
+Copilot provider can authenticate via the Copilot SDK session (for example, your existing VS Code GitHub/Copilot sign-in). In addition, it attempts token-based GitHub preflight checks when a token is available from the first source below:
 
 | Priority | Source | Notes |
 |----------|--------|-------|
@@ -174,9 +174,9 @@ Copilot provider resolves a GitHub token automatically from the first available 
 | 2 | `GH_TOKEN` env var | Standard GitHub CLI variable |
 | 3 | `gh auth token` | Token managed by VS Code GitHub extension or GitHub CLI |
 
-After a token is found, `as-docs` calls the GitHub API to confirm the login and verify an active Copilot subscription before initializing the SDK. If none of the sources yield a token, or the account has no Copilot entitlement, startup is refused with a clear error message.
+If a token is found, `as-docs` performs a best-effort GitHub preflight (login + Copilot entitlement check). Preflight is non-blocking: failures are logged and the provider continues with SDK auth.
 
-The raw token is **never stored on the provider object** — the Copilot SDK auto-discovers the VS Code session at runtime.
+The raw token is **never stored on the provider object** — the Copilot SDK handles runtime auth discovery/session use.
 
 Anthropic provider reads the key from `ai.api_key_env` (for example `ANTHROPIC_API_KEY`) and initializes the Anthropic SDK directly.
 
