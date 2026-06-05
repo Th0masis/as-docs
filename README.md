@@ -39,8 +39,9 @@ pip install -e .
 # In your AS project directory (or any subdirectory)
 as-docs init                    # detect project root, create .as-docs.yaml
 
-# Set token for Copilot/GitHub Models compatible endpoint
-$env:GITHUB_TOKEN = "<token>"
+# GitHub credentials are resolved automatically (see Authentication below).
+# Optionally set GITHUB_TOKEN to override:
+# $env:GITHUB_TOKEN = "<token>"
 
 # Generate Level 1 docs (no AI, instant)
 as-docs generate --no-ai
@@ -103,7 +104,7 @@ AI provider settings are under `ai:`:
 - `provider`: `copilot` is the active Phase 2 runtime provider; `anthropic` is reserved but not enabled in this branch
 - `model`: model name passed to the Copilot SDK session
 - `api_base_url`: optional custom OpenAI/Azure endpoint (BYOK) passed through Copilot SDK provider config
-- `api_key_env`: environment variable that stores the access token
+- `api_key_env`: environment variable checked *first* during token discovery (see Authentication below)
 
 Example:
 
@@ -143,9 +144,23 @@ Suggested operational pattern for reliable enrichment quality:
 3. Treat cache as provider+model scoped (already implemented) to avoid cross-model contamination.
 4. Re-run enrichment only for changed POUs/tasks (`as-docs diff` + targeted cache clear) to keep costs and drift low.
 
+## Authentication
+
+The Copilot provider resolves a GitHub token automatically from the first available source:
+
+| Priority | Source | Notes |
+|----------|--------|-------|
+| 1 | Env var named by `ai.api_key_env` | Default: `GITHUB_TOKEN` |
+| 2 | `GH_TOKEN` env var | Standard GitHub CLI variable |
+| 3 | `gh auth token` | Token managed by VS Code GitHub extension or GitHub CLI |
+
+After a token is found, `as-docs` calls the GitHub API to confirm the login and verify an active Copilot subscription before initializing the SDK. If none of the sources yield a token, or the account has no Copilot entitlement, startup is refused with a clear error message.
+
+The raw token is **never stored on the provider object** — the Copilot SDK auto-discovers the VS Code session at runtime.
+
 ## Current Phase 2 Status
 
-- Implemented: config validation, provider abstraction, copilot runtime client, prompt generation, Level 2/3 enrichment pipeline, cache, CLI visibility, mocked test coverage
+- Implemented: config validation, provider abstraction, copilot runtime client (auto-auth + entitlement check), prompt generation, Level 2/3 enrichment pipeline, cache, CLI visibility, mocked test coverage
 - Deferred: anthropic runtime client, provider override flag on CLI, Level 2/3 dedicated markdown page generation
 - Current enriched output target: `knowledge_graph.json`; Level 1 markdown files remain the primary human-readable output in this branch
 
@@ -153,4 +168,4 @@ Suggested operational pattern for reliable enrichment quality:
 
 - Python 3.11+
 - B&R Automation Studio 4.x project
-- GitHub token for the configured endpoint (default env var: `GITHUB_TOKEN`)
+- GitHub account with an active Copilot subscription (token resolved automatically; see Authentication)

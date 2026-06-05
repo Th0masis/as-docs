@@ -903,6 +903,8 @@ Phase 1 — Foundation                              ~1.5 weeks
 Phase 2 — AI Enrichment                           ~1 week
   ├── AI provider abstraction (`copilot` runtime implemented, `anthropic` reserved)
   ├── Copilot-compatible client integration (implemented)
+  ├── Auto token discovery: env var → GH_TOKEN → `gh auth token` (VS Code/CLI)
+  ├── GitHub API pre-flight: login resolution + Copilot entitlement check
   ├── Anthropic client integration (deferred)
   ├── Hash-based cache (.as-docs-cache/, gitignored)
   ├── Per-POU description + pattern detection (Level 2 + Level 3)
