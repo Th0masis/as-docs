@@ -4,7 +4,7 @@ Scope: implement Phase 2 AI enrichment while preserving the existing architectur
 
 Current implementation scope in this branch:
 - GitHub Copilot / GitHub Models compatible runtime is the active provider path.
-- Anthropic remains architecturally reserved but is not enabled at runtime in this branch.
+- Anthropic is available as fallback provider runtime.
 
 ## 1) Config and Provider Abstraction
 
@@ -25,7 +25,7 @@ Current implementation scope in this branch:
 ## 3) Provider Clients
 
 - [x] Create provider interface (single request contract for task and POU prompts).
-- [ ] Implement Anthropic client using existing SDK path.
+- [x] Implement Anthropic client using existing SDK path.
 - [x] Implement Copilot-backed client path for analyzer calls.
 - [ ] Ensure both providers return the same normalized response schema.
 - [x] Add deterministic retry/backoff and timeout handling.
@@ -54,13 +54,12 @@ Current implementation scope in this branch:
 
 ## 7) Done Criteria
 
-- [ ] Level 2 and Level 3 enrichment runs end-to-end with either provider.
+- [x] Level 2 and Level 3 enrichment runs end-to-end with either provider.
 - [x] Cached rerun performs zero new AI calls when inputs are unchanged.
 - [x] `knowledge_graph.json` contains enriched descriptions/patterns as designed.
 - [x] README and config example fully document provider selection.
 
 ## Remaining Gaps
 
-- Anthropic runtime client is still deferred.
 - Cross-provider contract parity tests are still deferred.
 - Dedicated task and POU markdown pages are still deferred.

@@ -160,16 +160,9 @@ def generate(level: int | None, no_ai: bool, config_path: str | None) -> None:
 @click.option("--config", "config_path", default=None, type=click.Path())
 def upgrade(to_level: int, pou: str | None, config_path: str | None) -> None:
     """Upgrade documentation to a higher level."""
-    import os
     cfg = _load_cfg(config_path)
     if not cfg.ai.enabled:
         click.echo("❌  AI is disabled in config. Set ai.enabled: true", err=True)
-        sys.exit(1)
-    if cfg.ai.provider == "copilot" and cfg.ai.api_key_env not in os.environ:
-        click.echo(
-            f"❌  {cfg.ai.api_key_env} environment variable not set for copilot provider.",
-            err=True,
-        )
         sys.exit(1)
 
     scope = f"pou:{pou}" if pou else "all"

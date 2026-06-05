@@ -101,10 +101,10 @@ Copy `.as-docs.yaml.example` to `.as-docs.yaml` in your AS project root and edit
 
 AI provider settings are under `ai:`:
 
-- `provider`: `copilot` is the active Phase 2 runtime provider; `anthropic` is reserved but not enabled in this branch
-- `model`: model name passed to the Copilot SDK session
-- `api_base_url`: optional custom OpenAI/Azure endpoint (BYOK) passed through Copilot SDK provider config
-- `api_key_env`: environment variable checked *first* during token discovery (see Authentication below)
+- `provider`: `copilot` (default) or `anthropic` fallback
+- `model`: provider-specific model name (for example `gpt-4.1` for Copilot, `claude-3-5-sonnet-latest` for Anthropic)
+- `api_base_url`: optional provider endpoint override (Copilot SDK provider config or Anthropic-compatible gateway)
+- `api_key_env`: primary environment variable name used for provider authentication
 
 Example:
 
@@ -120,9 +120,29 @@ ai:
   cache_dir: ".as-docs-cache"
 ```
 
+Provider quick examples:
+
+```yaml
+# Copilot (default)
+ai:
+  provider: "copilot"
+  model: "gpt-4.1"
+  api_key_env: "GITHUB_TOKEN"
+```
+
+```yaml
+# Anthropic fallback
+ai:
+  provider: "anthropic"
+  model: "claude-3-5-sonnet-latest"
+  api_key_env: "ANTHROPIC_API_KEY"
+```
+
 ## AI Generation and Enrichment (Copilot SDK Aligned)
 
-This project performs AI enrichment through the Copilot SDK session API and normalizes strict JSON into the knowledge graph.
+This project performs AI enrichment through provider clients and normalizes strict JSON into the knowledge graph.
+
+Default runtime is Copilot SDK. Anthropic is implemented as a fallback provider for users without GitHub Copilot.
 
 After reviewing `github/copilot-sdk`, the recommended mental model for generation and enrichment is:
 
@@ -134,8 +154,8 @@ After reviewing `github/copilot-sdk`, the recommended mental model for generatio
 
 How this maps to `as-docs` today:
 
-- **Implemented now**: direct Copilot SDK session runtime, deterministic enrichment prompts, provider/model-aware cache keys, strict JSON normalization, and enrichment write-back into `knowledge_graph.json`
-- **Optional compatibility mode**: set `ai.api_base_url` to route through a custom OpenAI/Azure endpoint via Copilot SDK provider config
+- **Implemented now**: direct Copilot SDK runtime, Anthropic runtime fallback, deterministic enrichment prompts, provider/model-aware cache keys, strict JSON normalization, and enrichment write-back into `knowledge_graph.json`
+- **Optional compatibility mode**: set `ai.api_base_url` to route through a custom endpoint for the selected provider
 
 Suggested operational pattern for reliable enrichment quality:
 
@@ -146,7 +166,7 @@ Suggested operational pattern for reliable enrichment quality:
 
 ## Authentication
 
-The Copilot provider resolves a GitHub token automatically from the first available source:
+Copilot provider resolves a GitHub token automatically from the first available source:
 
 | Priority | Source | Notes |
 |----------|--------|-------|
@@ -158,14 +178,18 @@ After a token is found, `as-docs` calls the GitHub API to confirm the login and 
 
 The raw token is **never stored on the provider object** — the Copilot SDK auto-discovers the VS Code session at runtime.
 
+Anthropic provider reads the key from `ai.api_key_env` (for example `ANTHROPIC_API_KEY`) and initializes the Anthropic SDK directly.
+
 ## Current Phase 2 Status
 
-- Implemented: config validation, provider abstraction, copilot runtime client (auto-auth + entitlement check), prompt generation, Level 2/3 enrichment pipeline, cache, CLI visibility, mocked test coverage
-- Deferred: anthropic runtime client, provider override flag on CLI, Level 2/3 dedicated markdown page generation
+- Implemented: config validation, provider abstraction, copilot runtime client (auto-auth + entitlement check), anthropic runtime fallback client, prompt generation, Level 2/3 enrichment pipeline, cache, CLI visibility, mocked test coverage
+- Deferred: provider override flag on CLI, Level 2/3 dedicated markdown page generation, cross-provider contract parity tests
 - Current enriched output target: `knowledge_graph.json`; Level 1 markdown files remain the primary human-readable output in this branch
 
 ## Requirements
 
 - Python 3.11+
 - B&R Automation Studio 4.x project
-- GitHub account with an active Copilot subscription (token resolved automatically; see Authentication)
+- One AI provider credential path:
+  - GitHub account with active Copilot subscription (token resolved automatically), or
+  - Anthropic API key in the environment variable configured by `ai.api_key_env`

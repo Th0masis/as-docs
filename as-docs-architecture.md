@@ -49,7 +49,7 @@ as-docs/                              monorepo — one version number
 │   │   └── graph.py                  KnowledgeGraph (nodes + edges)
 │   │
 │   ├── enricher/                     Layer 3: AI enrichment
-│   │   ├── ai_enricher.py            AI provider calls per POU/task (Copilot-first runtime in current branch)
+│   │   ├── ai_enricher.py            AI provider calls per POU/task (Copilot-first with Anthropic fallback)
 │   │   ├── cache.py                  SHA256 hash-based cache
 │   │   └── prompts.py                prompt templates per level
 │   │
@@ -466,7 +466,7 @@ Group all `Instance.Field :=` statements immediately preceding `Instance()` as i
 
 ### AI Model
 - Current branch default provider/model: Copilot-compatible chat completions + `gpt-4.1`
-- Anthropic provider remains reserved in config/architecture but is not enabled at runtime in this branch
+- Anthropic provider is available as a fallback runtime for users without Copilot
 - `max_tokens: 1024` for Level 2/3, `2048` for Level 4 (Mermaid can be verbose)
 
 ### Level 2 Prompt (task-scoped, no source code)
@@ -874,8 +874,8 @@ The as-docs MCP is registered in `template/.github/agents/as-project.agent.md` a
 Python 3.11+
 ├── click / typer         CLI interface
 ├── urllib / json         current Copilot-compatible chat completions client path
-├── anthropic             reserved dependency for future provider path
-├── copilot integration   current AI analyzer provider path
+├── anthropic             fallback AI analyzer provider path
+├── copilot integration   default AI analyzer provider path
 ├── fastmcp               MCP server (stdio + HTTP)
 ├── jinja2                documentation templating
 ├── gitpython             git diff integration for incremental updates
