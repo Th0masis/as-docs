@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import ctypes
+import ctypes.wintypes
 import json
 import logging
 import os
+import platform
 import subprocess
 import time
 import urllib.error
@@ -21,21 +24,127 @@ SYSTEM_INSTRUCTION = (
 
 _GH_API = "https://api.github.com"
 _COPILOT_TOKEN_URL = f"{_GH_API}/copilot_internal/v2/token"
+_COPILOT_CHAT_URL = "https://api.githubcopilot.com/chat/completions"
 _LOG = logging.getLogger(__name__)
 
 
-def _resolve_github_token(api_key_env: str = "GITHUB_TOKEN") -> str | None:
-    """Return a GitHub token from the first available source.
+def _resolve_vscode_token_windows() -> str | None:
+    """Read VS Code's stored GitHub OAuth token from Windows Credential Manager.
+
+    VS Code's GitHub authentication extension persists the session as a JSON blob
+    under the generic credential target ``vscode.github-authentication``.
+    The blob is UTF-16-LE encoded and contains a JSON array of session objects,
+    each with an ``accessToken`` field.
+    """
+    if platform.system() != "Windows":
+        return None
+
+    class _FILETIME(ctypes.Structure):
+        _fields_ = [("dwLowDateTime", ctypes.wintypes.DWORD),
+                    ("dwHighDateTime", ctypes.wintypes.DWORD)]
+
+    class _CREDENTIAL(ctypes.Structure):
+        _fields_ = [
+            ("Flags", ctypes.wintypes.DWORD),
+            ("Type", ctypes.wintypes.DWORD),
+            ("TargetName", ctypes.wintypes.LPWSTR),
+            ("Comment", ctypes.wintypes.LPWSTR),
+            ("LastWritten", _FILETIME),
+            ("CredentialBlobSize", ctypes.wintypes.DWORD),
+            ("CredentialBlob", ctypes.POINTER(ctypes.c_ubyte)),
+            ("Persist", ctypes.wintypes.DWORD),
+            ("AttributeCount", ctypes.wintypes.DWORD),
+            ("Attributes", ctypes.c_void_p),
+            ("TargetAlias", ctypes.wintypes.LPWSTR),
+            ("UserName", ctypes.wintypes.LPWSTR),
+        ]
+
+    CRED_TYPE_GENERIC = 1
+    try:
+        advapi32 = ctypes.windll.advapi32  # type: ignore[attr-defined]
+        advapi32.CredReadW.restype = ctypes.wintypes.BOOL
+        advapi32.CredReadW.argtypes = [
+            ctypes.wintypes.LPCWSTR,
+            ctypes.wintypes.DWORD,
+            ctypes.wintypes.DWORD,
+            ctypes.POINTER(ctypes.POINTER(_CREDENTIAL)),
+        ]
+        advapi32.CredFree.argtypes = [ctypes.c_void_p]
+
+        pcred = ctypes.POINTER(_CREDENTIAL)()
+        if not advapi32.CredReadW(
+            "vscode.github-authentication", CRED_TYPE_GENERIC, 0, ctypes.byref(pcred)
+        ):
+            return None
+
+        try:
+            cred = pcred.contents
+            raw = bytes(cred.CredentialBlob[i] for i in range(cred.CredentialBlobSize))
+            blob = raw.decode("utf-16-le", errors="replace")
+            sessions = json.loads(blob)
+            if isinstance(sessions, list):
+                for sess in sessions:
+                    tok = sess.get("accessToken", "").strip()
+                    if tok:
+                        _LOG.info("Using VS Code GitHub session token from Windows Credential Manager.")
+                        return tok
+        finally:
+            advapi32.CredFree(pcred)
+    except Exception as exc:
+        _LOG.debug("Windows Credential Manager read failed: %s", exc)
+    return None
+
+
+def _resolve_git_credential_token() -> str | None:
+    """Read GitHub token from git credential helper (e.g., Git Credential Manager)."""
+    try:
+        result = subprocess.run(
+            ["git", "credential", "fill"],
+            input="protocol=https\nhost=github.com\n\n",
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return None
+
+        username = ""
+        password = ""
+        for line in result.stdout.splitlines():
+            if line.startswith("username="):
+                username = line.split("=", 1)[1].strip()
+            elif line.startswith("password="):
+                password = line.split("=", 1)[1].strip()
+
+        # GitHub credential helpers usually return PAT/OAuth token in the password field.
+        if password and username:
+            return password
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return None
+
+
+def _resolve_github_token_with_source(api_key_env: str = "GITHUB_TOKEN") -> tuple[str | None, str]:
+    """Return a GitHub token and a human-readable source label.
 
     Priority:
-    1. Environment variable named by *api_key_env* (config-defined, e.g. ``GITHUB_TOKEN``).
-    2. ``GH_TOKEN`` standard GitHub CLI env var.
-    3. ``gh auth token`` from the GitHub CLI (used by VS Code's GitHub extension).
+    1. If *api_key_env* itself looks like a GitHub token (starts with ``ghp_`` or
+       ``github_pat_``), use it directly — the user placed the token in the config
+       field rather than an env-var name.
+    2. Environment variable named by *api_key_env* (config-defined, e.g. ``GITHUB_TOKEN``).
+    3. ``GH_TOKEN`` standard GitHub CLI env var.
+    4. ``gh auth token`` from the GitHub CLI (used by VS Code's GitHub extension).
+    5. Git credential helper entry for https://github.com (e.g., GCM).
+    6. VS Code's stored GitHub session token from Windows Credential Manager.
     """
+    # Support accidental direct-token usage in the api_key_env config field.
+    if api_key_env.startswith(("ghp_", "github_pat_", "ghu_")):
+        return api_key_env, "config-direct-token"
+
     for var in (api_key_env, "GH_TOKEN", "GITHUB_TOKEN"):
         tok = os.getenv(var, "").strip()
         if tok:
-            return tok
+            return tok, f"env:{var}"
 
     try:
         result = subprocess.run(
@@ -47,11 +156,32 @@ def _resolve_github_token(api_key_env: str = "GITHUB_TOKEN") -> str | None:
         if result.returncode == 0:
             tok = result.stdout.strip()
             if tok:
-                return tok
+                return tok, "gh-cli"
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         pass
 
-    return None
+    tok = _resolve_git_credential_token()
+    if tok:
+        return tok, "git-credential-helper"
+
+    # Last resort: read VS Code's own stored GitHub session from the OS keychain.
+    tok = _resolve_vscode_token_windows()
+    if tok:
+        return tok, "vscode-windows-credential-manager"
+
+    return None, "none"
+
+
+def _resolve_github_token(api_key_env: str = "GITHUB_TOKEN") -> str | None:
+    """Return only the resolved GitHub token (without source metadata)."""
+    tok, _ = _resolve_github_token_with_source(api_key_env)
+    return tok
+
+
+def _has_resolvable_github_token(api_key_env: str = "GITHUB_TOKEN") -> bool:
+    """Whether any token source can currently be resolved."""
+    tok, _ = _resolve_github_token_with_source(api_key_env)
+    return bool(tok)
 
 
 def _verify_copilot_entitlement(token: str) -> str:
@@ -86,8 +216,8 @@ def _verify_copilot_entitlement(token: str) -> str:
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403, 422):
             raise RuntimeError(
-                f"GitHub account '{login}' does not have an active Copilot subscription. "
-                "Visit https://github.com/features/copilot to subscribe."
+                f"Copilot entitlement preflight was denied for GitHub account '{login}' "
+                f"(HTTP {exc.code}). Runtime access may still succeed via SDK or org policy."
             ) from exc
         # Unexpected HTTP error – treat as a transient network issue, not a hard block.
         # Log and continue; the SDK itself will surface a cleaner error if Copilot is unavailable.
@@ -97,11 +227,75 @@ def _verify_copilot_entitlement(token: str) -> str:
     return login
 
 
+def _get_copilot_api_token(github_token: str) -> str:
+    """Exchange a GitHub PAT for a short-lived Copilot API token."""
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "as-docs",
+    }
+    try:
+        req = urllib.request.Request(_COPILOT_TOKEN_URL, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+            data = json.loads(resp.read())
+        token = data.get("token", "")
+        if not token:
+            raise RuntimeError("Copilot token exchange returned no token.")
+        return token
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(
+            f"Failed to obtain Copilot API token (HTTP {exc.code}). "
+            "Ensure your GitHub token has Copilot access."
+        ) from exc
+
+
+def _send_via_copilot_http(
+    github_token: str,
+    prompt: str,
+    model: str,
+    max_tokens: int,
+    timeout: int,
+) -> str:
+    """Call the Copilot Chat completions API directly using HTTP (no SDK required)."""
+    copilot_token = _get_copilot_api_token(github_token)
+
+    headers = {
+        "Authorization": f"Bearer {copilot_token}",
+        "Content-Type": "application/json",
+        "User-Agent": "as-docs",
+        "Copilot-Integration-Id": "vscode-chat",
+        "Editor-Version": "vscode/1.90.0",
+        "Editor-Plugin-Version": "copilot-chat/0.15.0",
+    }
+    body = json.dumps({
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": [
+            {"role": "system", "content": SYSTEM_INSTRUCTION},
+            {"role": "user", "content": prompt},
+        ],
+    }).encode()
+
+    try:
+        req = urllib.request.Request(_COPILOT_CHAT_URL, data=body, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            result = json.loads(resp.read())
+        content = result["choices"][0]["message"]["content"]
+        if not content:
+            raise RuntimeError("Copilot API returned empty content.")
+        return content
+    except urllib.error.HTTPError as exc:
+        body_text = exc.read().decode(errors="replace")
+        raise RuntimeError(f"Copilot API request failed (HTTP {exc.code}): {body_text}") from exc
+
+
 class CopilotProvider:
     def __init__(self, ai_config: AIConfig) -> None:
         self._cfg = ai_config
-        token = _resolve_github_token(ai_config.api_key_env)
+        token, token_source = _resolve_github_token_with_source(ai_config.api_key_env)
         self._github_login = "<unknown>"
+
+        _LOG.info("Resolved GitHub credential source: %s", token_source)
 
         # SDK auth can use the current VS Code session without explicit tokens.
         # Token-based GitHub preflight is best-effort only and must not block.
@@ -109,7 +303,8 @@ class CopilotProvider:
             try:
                 self._github_login = _verify_copilot_entitlement(token)
             except Exception as exc:
-                _LOG.warning("Copilot preflight check failed; continuing with SDK auth: %s", exc)
+                _LOG.info("Copilot preflight check inconclusive; continuing with SDK auth.")
+                _LOG.debug("Copilot preflight details: %s", exc)
         else:
             _LOG.info(
                 "No explicit GitHub token found for preflight. "
@@ -127,20 +322,95 @@ class CopilotProvider:
 
     def _request(self, prompt: str, model: str, max_tokens: int) -> EnrichmentPayload:
         max_attempts = self._cfg.max_retries + 1
+        last_exc: Exception | None = None
         for attempt in range(1, max_attempts + 1):
             try:
                 content = self._send_with_sdk(prompt=prompt, model=model, max_tokens=max_tokens)
                 raw_json = _extract_json_block(content)
                 parsed = json.loads(raw_json)
                 return _normalize_payload(parsed)
-            except (RuntimeError, TimeoutError) as exc:
+            except (RuntimeError, TimeoutError, Exception) as exc:
+                if _is_sdk_auth_error(exc):
+                    # SDK auth failure: only try HTTP fallback when a token is actually available.
+                    # Otherwise preserve the original SDK error to avoid masking the root cause.
+                    if _has_resolvable_github_token(self._cfg.api_key_env):
+                        _LOG.info("SDK auth failed; attempting direct Copilot HTTP API fallback.")
+                        return self._request_via_http(prompt=prompt, model=model, max_tokens=max_tokens)
+                    if attempt >= max_attempts:
+                        raise RuntimeError(f"Copilot provider request failed: {exc}") from exc
+                    last_exc = exc
+                    time.sleep(0.4 * attempt)
+                    continue
+                if _is_sdk_model_error(exc):
+                    # Model is not available in SDK — try fallback models without retrying.
+                    return self._request_with_fallback_models(
+                        prompt=prompt, model=model, max_tokens=max_tokens
+                    )
                 if attempt >= max_attempts:
                     raise RuntimeError(f"Copilot provider request failed: {exc}") from exc
+                last_exc = exc
                 time.sleep(0.4 * attempt)
             except json.JSONDecodeError as exc:
                 raise RuntimeError(f"Copilot provider returned invalid JSON: {exc}") from exc
 
-        raise RuntimeError("Copilot provider request failed after retries.")
+        raise RuntimeError(f"Copilot provider request failed after retries: {last_exc}")
+
+    def _request_with_fallback_models(
+        self, prompt: str, model: str, max_tokens: int
+    ) -> EnrichmentPayload:
+        """Try a list of fallback models when the requested model is unavailable in the SDK."""
+        fallback_models = [m for m in _SDK_FALLBACK_MODELS if m != model]
+        _LOG.warning(
+            "Model '%s' is not available in the Copilot SDK. Trying fallbacks: %s",
+            model,
+            fallback_models,
+        )
+        for fb_model in fallback_models:
+            try:
+                _LOG.info("Trying fallback model '%s' via SDK.", fb_model)
+                content = self._send_with_sdk(prompt=prompt, model=fb_model, max_tokens=max_tokens)
+                raw_json = _extract_json_block(content)
+                parsed = json.loads(raw_json)
+                _LOG.info("Fallback model '%s' succeeded.", fb_model)
+                return _normalize_payload(parsed)
+            except Exception as exc:
+                if _is_sdk_model_error(exc):
+                    _LOG.warning("Fallback model '%s' also unavailable; trying next.", fb_model)
+                    continue
+                if _is_sdk_auth_error(exc):
+                    if _has_resolvable_github_token(self._cfg.api_key_env):
+                        break
+                    _LOG.warning(
+                        "Fallback model '%s' hit SDK auth error but no token is available; "
+                        "continuing with SDK model fallbacks.",
+                        fb_model,
+                    )
+                    continue
+                _LOG.warning("Fallback model '%s' failed: %s", fb_model, exc)
+                continue
+
+        # All SDK fallbacks exhausted — try the HTTP fallback with the original model.
+        _LOG.info("All SDK model fallbacks exhausted; attempting direct Copilot HTTP fallback.")
+        return self._request_via_http(prompt=prompt, model=model, max_tokens=max_tokens)
+
+    def _request_via_http(self, prompt: str, model: str, max_tokens: int) -> EnrichmentPayload:
+        """Direct HTTP fallback — works from any terminal without VS Code session auth."""
+        token = _resolve_github_token(self._cfg.api_key_env)
+        if not token:
+            raise RuntimeError(
+                _sdk_auth_error_message(self._cfg.api_key_env)
+                + "\n\nDirect HTTP fallback also failed: no GitHub token available."
+            )
+        content = _send_via_copilot_http(
+            github_token=token,
+            prompt=prompt,
+            model=model,
+            max_tokens=max_tokens,
+            timeout=self._cfg.timeout_seconds,
+        )
+        raw_json = _extract_json_block(content)
+        parsed = json.loads(raw_json)
+        return _normalize_payload(parsed)
 
     def _send_with_sdk(self, prompt: str, model: str, max_tokens: int) -> str:
         try:
@@ -166,7 +436,12 @@ class CopilotProvider:
                 "Copilot SDK is not installed. Install package 'github-copilot-sdk'."
             ) from exc
 
-        client = CopilotClient()
+        sdk_token = _resolve_github_token(self._cfg.api_key_env)
+        client_kwargs: dict[str, Any] = {}
+        if sdk_token:
+            client_kwargs["github_token"] = sdk_token
+
+        client = CopilotClient(**client_kwargs)
         await client.start()
 
         session = None
@@ -174,8 +449,10 @@ class CopilotProvider:
             session_kwargs: dict[str, Any] = {
                 "on_permission_request": PermissionHandler.approve_all,
                 "model": model,
-                # No github_token — SDK auto-discovers VS Code GitHub session.
             }
+
+            if sdk_token:
+                session_kwargs["github_token"] = sdk_token
 
             # Backward compatibility: if a custom provider endpoint is configured,
             # route requests through SDK provider config instead of default Copilot routing.
@@ -230,6 +507,36 @@ def _extract_json_block(text: str) -> str:
     if start < 0 or end < 0 or end <= start:
         raise RuntimeError("Copilot provider response does not contain a JSON object.")
     return text[start : end + 1]
+
+
+def _is_sdk_auth_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "session was not created with authentication info" in msg
+
+
+def _is_sdk_model_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "is not available" in msg and "model" in msg
+
+
+# Ordered list of models to try when the configured model is unavailable in the SDK.
+_SDK_FALLBACK_MODELS = [
+    "gpt-4.1",
+    "gpt-4o",
+    "gpt-4",
+    "claude-3.5-sonnet",
+    "claude-3-sonnet",
+    "gpt-3.5-turbo",
+]
+
+
+def _sdk_auth_error_message(api_key_env: str) -> str:
+    return (
+        "Copilot SDK authentication failed. "
+        "The runtime could not use VS Code session auth and no valid token was supplied. "
+        f"Set the {api_key_env} environment variable (or GH_TOKEN), "
+        "or run 'gh auth login' and retry."
+    )
 
 
 def _normalize_payload(data: dict[str, Any]) -> EnrichmentPayload:

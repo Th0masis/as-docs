@@ -1,5 +1,6 @@
 """Click CLI entry points for as-docs."""
 from __future__ import annotations
+import logging
 import sys
 from pathlib import Path
 
@@ -10,8 +11,17 @@ from as_docs.config import Config, find_project_root, load_config
 
 @click.group()
 @click.version_option()
-def cli() -> None:
+@click.option("-v", "--verbose", is_flag=True, default=False, help="Enable DEBUG logging.", envvar="AS_DOCS_VERBOSE")
+@click.pass_context
+def cli(ctx: click.Context, verbose: bool) -> None:
     """as-docs — Documentation generator for B&R Automation Studio projects."""
+    ctx.ensure_object(dict)
+    ctx.obj["verbose"] = verbose
+    level = logging.DEBUG if verbose else logging.WARNING
+    logging.basicConfig(
+        level=level,
+        format="%(levelname)-8s %(name)s — %(message)s",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +127,8 @@ git:
 @click.option("--level", default=None, type=int, help="Documentation level (1–4). Default from config.")
 @click.option("--no-ai", "no_ai", is_flag=True, help="Skip AI enrichment (Level 1 only).")
 @click.option("--config", "config_path", default=None, type=click.Path(), help="Path to .as-docs.yaml")
-def generate(level: int | None, no_ai: bool, config_path: str | None) -> None:
+@click.pass_context
+def generate(ctx: click.Context, level: int | None, no_ai: bool, config_path: str | None) -> None:
     """Generate documentation for the AS project."""
     from as_docs.engine import run_generate
 
