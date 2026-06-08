@@ -113,7 +113,8 @@ If config auto-detection is not reliable for your setup, pass config path explic
 - "No generated docs found": run as-docs generate first.
 - "Cannot find AS project root": run in a directory under the AS project containing Logical and Physical.
 - MCP server not visible in chat: reload VS Code window or restart chat/MCP session after editing mcp.json.
-- AI issues: verify credentials (for Copilot, check GitHub login and Copilot entitlement).
+- AI issues: run `as-docs -v generate --level 3` and check `Resolved GitHub credential source: ...`.
+  - If source is `none`, set `GITHUB_TOKEN` or configure Git Credential Manager / `gh auth login`.
 
 ## Recommended daily workflow
 

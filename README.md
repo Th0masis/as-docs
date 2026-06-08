@@ -40,7 +40,7 @@ pip install -e .
 as-docs init                    # detect project root, create .as-docs.yaml
 
 # GitHub credentials are resolved automatically (see Authentication below).
-# Optionally set GITHUB_TOKEN to override:
+# Optionally set GITHUB_TOKEN to override auto-detection:
 # $env:GITHUB_TOKEN = "<token>"
 
 # Generate Level 1 docs (no AI, instant)
@@ -166,15 +166,25 @@ Suggested operational pattern for reliable enrichment quality:
 
 ## Authentication
 
-Copilot provider can authenticate via the Copilot SDK session (for example, your existing VS Code GitHub/Copilot sign-in). In addition, it attempts token-based GitHub preflight checks when a token is available from the first source below:
+Copilot provider can authenticate via the Copilot SDK session (Copilot CLI backend). In addition, it attempts token-based GitHub preflight checks when a token is available from the first source below:
 
 | Priority | Source | Notes |
 |----------|--------|-------|
 | 1 | Env var named by `ai.api_key_env` | Default: `GITHUB_TOKEN` |
 | 2 | `GH_TOKEN` env var | Standard GitHub CLI variable |
-| 3 | `gh auth token` | Token managed by VS Code GitHub extension or GitHub CLI |
+| 3 | `gh auth token` | GitHub CLI token |
+| 4 | `git credential fill` (`https://github.com`) | Git Credential Manager / git credential helper |
+| 5 | Windows Credential Manager target `vscode.github-authentication` | VS Code GitHub Authentication extension session |
 
 If a token is found, `as-docs` performs a best-effort GitHub preflight (login + Copilot entitlement check). Preflight is non-blocking: failures are logged and the provider continues with SDK auth.
+
+To inspect auth/runtime decisions, run with verbose mode:
+
+```bash
+as-docs -v generate --level 3
+```
+
+Look for `Resolved GitHub credential source: ...` in logs.
 
 The raw token is **never stored on the provider object** — the Copilot SDK handles runtime auth discovery/session use.
 
