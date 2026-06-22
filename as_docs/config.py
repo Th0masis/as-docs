@@ -32,6 +32,7 @@ class AIConfig:
     model: str = "gpt-4.1"
     api_base_url: str = ""
     api_key_env: str = "GITHUB_TOKEN"
+    oauth_client_id: str = ""
     timeout_seconds: int = 60
     max_retries: int = 3
     cache_dir: str = ".as-docs-cache"

@@ -11,6 +11,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import Any
 
 from as_docs.config import AIConfig
@@ -25,6 +26,11 @@ SYSTEM_INSTRUCTION = (
 _GH_API = "https://api.github.com"
 _COPILOT_TOKEN_URL = f"{_GH_API}/copilot_internal/v2/token"
 _COPILOT_CHAT_URL = "https://api.githubcopilot.com/chat/completions"
+_DEVICE_CODE_URL = "https://github.com/login/device/code"
+_OAUTH_TOKEN_URL = "https://github.com/login/oauth/access_token"
+_DEVICE_FLOW_SCOPE = "read:user"
+_SLOW_DOWN_INCREMENT = 5
+_TOKEN_CACHE_PATH = Path.home() / ".config" / "as-docs" / "github_token"
 _LOG = logging.getLogger(__name__)
 
 
@@ -124,7 +130,122 @@ def _resolve_git_credential_token() -> str | None:
     return None
 
 
-def _resolve_github_token_with_source(api_key_env: str = "GITHUB_TOKEN") -> tuple[str | None, str]:
+def _save_device_flow_token(token: str) -> None:
+    """Persist a device-flow-obtained GitHub token to the local cache file."""
+    try:
+        _TOKEN_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _TOKEN_CACHE_PATH.write_text(token, encoding="utf-8")
+        if platform.system() != "Windows":
+            import stat as _stat
+            _TOKEN_CACHE_PATH.chmod(_stat.S_IRUSR | _stat.S_IWUSR)
+    except OSError as exc:
+        _LOG.debug("Could not save device flow token to cache: %s", exc)
+
+
+def _load_device_flow_token() -> str | None:
+    """Load a previously-saved device-flow token from the local cache file."""
+    try:
+        if _TOKEN_CACHE_PATH.exists():
+            tok = _TOKEN_CACHE_PATH.read_text(encoding="utf-8").strip()
+            if tok:
+                return tok
+    except OSError:
+        pass
+    return None
+
+
+def _resolve_github_token_via_device_flow(client_id: str) -> str | None:
+    """Authenticate interactively via GitHub OAuth Device Flow.
+
+    Displays a one-time code for the user to enter at https://github.com/login/device,
+    then polls until the user approves.  Saves the resulting token to the local
+    cache file so future runs skip the interactive prompt.
+
+    Requires *client_id* from a registered GitHub OAuth App.
+    Set ``oauth_client_id`` in ``.as-docs.yaml`` or the ``AS_DOCS_OAUTH_CLIENT_ID``
+    environment variable.
+    """
+    if not client_id:
+        return None
+
+    # Step 1: request a device + user code.
+    try:
+        body = json.dumps({"client_id": client_id, "scope": _DEVICE_FLOW_SCOPE}).encode()
+        req = urllib.request.Request(
+            _DEVICE_CODE_URL,
+            data=body,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+            data = json.loads(resp.read())
+    except Exception as exc:
+        _LOG.debug("Device flow code request failed: %s", exc)
+        return None
+
+    device_code = data.get("device_code", "")
+    user_code = data.get("user_code", "")
+    verification_uri = data.get("verification_uri", "https://github.com/login/device")
+    expires_in: int = data.get("expires_in", 900)
+    interval: int = data.get("interval", 5)
+
+    if not device_code or not user_code:
+        _LOG.debug("Device flow response missing device_code or user_code.")
+        return None
+
+    # Step 2: prompt the user.
+    print(f"\n  GitHub OAuth — Device Flow")
+    print(f"  1. Open:       {verification_uri}")
+    print(f"  2. Enter code: {user_code}")
+    print(f"  Waiting for authorization (expires in {expires_in}s) ...\n")
+
+    # Step 3: poll until approved or expired.
+    deadline = time.monotonic() + expires_in
+    current_interval = interval
+    while time.monotonic() < deadline:
+        time.sleep(current_interval)
+        try:
+            poll_body = json.dumps({
+                "client_id": client_id,
+                "device_code": device_code,
+                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+            }).encode()
+            req = urllib.request.Request(
+                _OAUTH_TOKEN_URL,
+                data=poll_body,
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+                result = json.loads(resp.read())
+        except Exception as exc:
+            _LOG.debug("Device flow poll failed: %s", exc)
+            continue
+
+        if "access_token" in result:
+            token: str = result["access_token"].strip()
+            _LOG.info("GitHub OAuth Device Flow completed successfully.")
+            _save_device_flow_token(token)
+            return token
+
+        error = result.get("error", "")
+        if error == "authorization_pending":
+            continue
+        if error == "slow_down":
+            current_interval += _SLOW_DOWN_INCREMENT
+            continue
+        # Fatal: expired_token, access_denied, incorrect_client_credentials, …
+        _LOG.debug("Device flow error: %s — %s", error, result.get("error_description", ""))
+        return None
+
+    _LOG.debug("Device flow timed out (expires_in=%s s).", expires_in)
+    return None
+
+
+def _resolve_github_token_with_source(
+    api_key_env: str = "GITHUB_TOKEN",
+    oauth_client_id: str = "",
+) -> tuple[str | None, str]:
     """Return a GitHub token and a human-readable source label.
 
     Priority:
@@ -136,6 +257,9 @@ def _resolve_github_token_with_source(api_key_env: str = "GITHUB_TOKEN") -> tupl
     4. ``gh auth token`` from the GitHub CLI (used by VS Code's GitHub extension).
     5. Git credential helper entry for https://github.com (e.g., GCM).
     6. VS Code's stored GitHub session token from Windows Credential Manager.
+    7. Cached GitHub token from a previous Device Flow login (~/.config/as-docs/github_token).
+    8. Interactive GitHub OAuth Device Flow (requires *oauth_client_id* or
+       ``AS_DOCS_OAUTH_CLIENT_ID`` env var to be set).
     """
     # Support accidental direct-token usage in the api_key_env config field.
     if api_key_env.startswith(("ghp_", "github_pat_", "ghu_")):
@@ -164,17 +288,30 @@ def _resolve_github_token_with_source(api_key_env: str = "GITHUB_TOKEN") -> tupl
     if tok:
         return tok, "git-credential-helper"
 
-    # Last resort: read VS Code's own stored GitHub session from the OS keychain.
     tok = _resolve_vscode_token_windows()
     if tok:
         return tok, "vscode-windows-credential-manager"
 
+    # Cached device-flow token from a previous interactive login.
+    tok = _load_device_flow_token()
+    if tok:
+        return tok, "device-flow-cache"
+
+    # Interactive Device Flow — only when a client_id is available.
+    client_id = oauth_client_id or os.getenv("AS_DOCS_OAUTH_CLIENT_ID", "").strip()
+    tok = _resolve_github_token_via_device_flow(client_id)
+    if tok:
+        return tok, "device-flow-interactive"
+
     return None, "none"
 
 
-def _resolve_github_token(api_key_env: str = "GITHUB_TOKEN") -> str | None:
+def _resolve_github_token(
+    api_key_env: str = "GITHUB_TOKEN",
+    oauth_client_id: str = "",
+) -> str | None:
     """Return only the resolved GitHub token (without source metadata)."""
-    tok, _ = _resolve_github_token_with_source(api_key_env)
+    tok, _ = _resolve_github_token_with_source(api_key_env, oauth_client_id)
     return tok
 
 
@@ -292,7 +429,9 @@ def _send_via_copilot_http(
 class CopilotProvider:
     def __init__(self, ai_config: AIConfig) -> None:
         self._cfg = ai_config
-        token, token_source = _resolve_github_token_with_source(ai_config.api_key_env)
+        token, token_source = _resolve_github_token_with_source(
+            ai_config.api_key_env, ai_config.oauth_client_id
+        )
         self._github_login = "<unknown>"
 
         _LOG.info("Resolved GitHub credential source: %s", token_source)
@@ -337,7 +476,10 @@ class CopilotProvider:
                         _LOG.info("SDK auth failed; attempting direct Copilot HTTP API fallback.")
                         return self._request_via_http(prompt=prompt, model=model, max_tokens=max_tokens)
                     if attempt >= max_attempts:
-                        raise RuntimeError(f"Copilot provider request failed: {exc}") from exc
+                        raise RuntimeError(
+                            f"Copilot SDK authentication failed. "
+                            f"{_sdk_auth_error_message(self._cfg.api_key_env)}"
+                        ) from exc
                     last_exc = exc
                     time.sleep(0.4 * attempt)
                     continue

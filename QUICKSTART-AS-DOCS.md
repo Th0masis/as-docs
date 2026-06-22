@@ -108,13 +108,58 @@ If config auto-detection is not reliable for your setup, pass config path explic
 - find readers and writers of gMotorSpeed
 - show cross-task data flow
 
-## 8) Troubleshooting
+## 8) GitHub Authentication
 
-- "No generated docs found": run as-docs generate first.
-- "Cannot find AS project root": run in a directory under the AS project containing Logical and Physical.
-- MCP server not visible in chat: reload VS Code window or restart chat/MCP session after editing mcp.json.
+`as-docs` resolves a GitHub token automatically using the following priority chain:
+
+| Priority | Source |
+|---|---|
+| 1 | Direct token value in `api_key_env` config field |
+| 2 | Environment variable named by `api_key_env` (e.g. `GITHUB_TOKEN`) |
+| 3 | `GH_TOKEN` environment variable |
+| 4 | `gh auth token` (GitHub CLI) |
+| 5 | Git Credential Manager (`git credential fill`) |
+| 6 | VS Code GitHub session (Windows Credential Manager) |
+| 7 | Cached Device Flow token (`~/.config/as-docs/github_token`) |
+| 8 | **Interactive OAuth Device Flow** (requires `oauth_client_id`) |
+
+### Option A — Environment variable (simplest)
+
+```bash
+# in your shell or .env
+GITHUB_TOKEN=ghp_your_token_here
+```
+
+### Option B — OAuth Device Flow (interactive, no PAT needed)
+
+Register a GitHub OAuth App and add the client ID to `.as-docs.yaml`:
+
+```yaml
+ai:
+  oauth_client_id: "your-github-oauth-app-client-id"
+```
+
+Or set `AS_DOCS_OAUTH_CLIENT_ID` as an environment variable.
+
+On first run with no token available, `as-docs` will print:
+
+```
+  GitHub OAuth — Device Flow
+  1. Open:       https://github.com/login/device
+  2. Enter code: XXXX-XXXX
+  Waiting for authorization ...
+```
+
+Once you authenticate in the browser the token is cached at
+`~/.config/as-docs/github_token` — you will not be prompted again.
+
+## 9) Troubleshooting
+
+- "No generated docs found": run `as-docs generate` first.
+- "Cannot find AS project root": run in a directory under the AS project containing `Logical` and `Physical`.
+- MCP server not visible in chat: reload VS Code window or restart chat/MCP session after editing `mcp.json`.
 - AI issues: run `as-docs -v generate --level 3` and check `Resolved GitHub credential source: ...`.
-  - If source is `none`, set `GITHUB_TOKEN` or configure Git Credential Manager / `gh auth login`.
+  - If source is `none`, follow the authentication options in section 8 above.
 
 ## Recommended daily workflow
 

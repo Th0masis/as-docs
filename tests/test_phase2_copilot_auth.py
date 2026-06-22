@@ -49,8 +49,8 @@ def test_copilot_provider_init_keeps_login_when_preflight_passes(monkeypatch) ->
     cfg.provider = "copilot"
 
     monkeypatch.setattr(
-        "as_docs.enricher.providers.copilot_client._resolve_github_token",
-        lambda _env: "fake-token",
+        "as_docs.enricher.providers.copilot_client._resolve_github_token_with_source",
+        lambda _env, _client_id="": ("fake-token", "mock"),
     )
     monkeypatch.setattr(
         "as_docs.enricher.providers.copilot_client._verify_copilot_entitlement",
@@ -81,8 +81,12 @@ def test_request_maps_generic_sdk_auth_exception_to_runtime_error(monkeypatch) -
     cfg.max_retries = 0
 
     monkeypatch.setattr(
-        "as_docs.enricher.providers.copilot_client._resolve_github_token",
-        lambda _env: None,
+        "as_docs.enricher.providers.copilot_client._resolve_github_token_with_source",
+        lambda _env, _client_id="": (None, "none"),
+    )
+    monkeypatch.setattr(
+        "as_docs.enricher.providers.copilot_client._has_resolvable_github_token",
+        lambda _env: False,
     )
 
     provider = CopilotProvider(cfg)
