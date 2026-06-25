@@ -39,21 +39,21 @@ Evidence used for verification:
 #### 1) Implement scoped regeneration for CLI and MCP
 - Priority: P0
 - Estimate: 0.5-1 day
-- Status: [ ]
+- Status: [x]
 - Why:
   - README currently states scoped regenerate/upgrade routes are exposed but execute full regeneration.
 - Tasks:
-  - [ ] Add real scope handling in engine for:
+  - [x] Add real scope handling in engine for:
     - changed files
     - single POU
     - all
-  - [ ] Wire CLI upgrade --pou to true scoped execution.
-  - [ ] Wire MCP regenerate(scope) to true scoped execution.
-  - [ ] Return clear result metadata (scope, touched POUs, elapsed time).
+  - [x] Wire CLI upgrade --pou to true scoped execution.
+  - [x] Wire MCP regenerate(scope) to true scoped execution.
+  - [x] Return clear result metadata (scope, touched POUs, elapsed time).
 - Done criteria:
-  - [ ] scope=changed only regenerates affected POUs.
-  - [ ] scope=pou:NAME only regenerates NAME.
-  - [ ] Existing full regeneration path remains intact.
+  - [x] scope=changed only regenerates affected POUs.
+  - [x] scope=pou:NAME only regenerates NAME.
+  - [x] Existing full regeneration path remains intact.
 
 #### 2) Implement Phase 4 git commands in CLI
 - Priority: P0

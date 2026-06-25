@@ -2,6 +2,7 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 
 from as_docs.config import Config, load_config
 from as_docs.model.graph import (
@@ -23,6 +24,7 @@ def run_generate(
     level: int = 1,
     ai_enabled: bool = False,
     project_root: Path | None = None,
+    scope: str = "all",
 ) -> KnowledgeGraph:
     """Run the full scan → analyze → generate pipeline.
 
@@ -36,9 +38,75 @@ def run_generate(
         The assembled KnowledgeGraph.
     """
     # 1. Scan
+    started = perf_counter()
     model = scan_project(config, project_root=project_root)
+    target_pous = _resolve_scope_targets(config, model, scope)
+    touched_pous = sorted(target_pous)
 
-    # 2. Analyze ST files
+    # 2. Analyze + assemble graph
+    if scope == "all":
+        graph = _build_full_graph(model, config=config, level=level)
+    else:
+        graph = _build_scoped_graph(
+            config=config,
+            model=model,
+            level=level,
+            scope=scope,
+            target_pous=target_pous,
+        )
+        touched_pous = sorted(set(touched_pous).intersection(set(graph.pous.keys())))
+
+    # 5. AI enrichment (Level 2+)
+    if ai_enabled and level >= 2:
+        from as_docs.enricher.ai_enricher import enrich_graph
+        ai_stats = enrich_graph(graph, level=level, config=config)
+        setattr(graph, "_ai_stats", ai_stats)
+
+    # 6. Generate outputs
+    output_dir = Path(config.output.docs_dir)
+    generate_json(graph, output_dir)
+    generate_all_markdown(graph, output_dir)
+    generate_llms_txt(graph, output_dir)
+
+    setattr(
+        graph,
+        "_regen_meta",
+        {
+            "scope": scope,
+            "touched_pous": touched_pous,
+            "elapsed_seconds": round(perf_counter() - started, 3),
+            "scanned_pous": len(model.pous),
+            "fallback_full": bool(getattr(graph, "_scoped_fallback_full", False)),
+        },
+    )
+
+    return graph
+
+
+def _resolve_scope_targets(config: Config, model: ProjectModel, scope: str) -> set[str]:
+    if scope == "all":
+        return set(model.pous.keys())
+
+    if scope.startswith("pou:"):
+        pou_name = scope.split(":", 1)[1].strip()
+        if not pou_name:
+            raise ValueError("Invalid scope 'pou:'. Use 'pou:<name>'.")
+        if pou_name not in model.pous:
+            raise ValueError(f"Unknown POU in scope: {pou_name}")
+        return {pou_name}
+
+    if scope == "changed":
+        stale = get_staleness(config, project_root=model.project_root)
+        return {
+            pou_name
+            for pou_name, state in stale.items()
+            if state in {"stale", "missing"} and pou_name in model.pous
+        }
+
+    raise ValueError("Invalid scope. Use one of: all, changed, pou:<name>.")
+
+
+def _build_full_graph(model: ProjectModel, config: Config, level: int) -> KnowledgeGraph:
     known_pous = set(model.pous.keys())
     known_vars = set(model.global_vars.keys())
     ext_prefixes = config.scanner.external_lib_prefixes
@@ -48,17 +116,13 @@ def run_generate(
         result = analyze_st(st_file, known_pous, known_vars, ext_prefixes)
         analysis_results.append(result)
 
-        # Backfill instances into POUNode
         pou = model.pous.get(st_file.pou_name)
         if pou and result.instances:
             pou.instances = result.instances
 
-    # 3. Build edges
     edges = build_edges(model, analysis_results)
-    model.edges = edges
 
-    # 4. Assemble KnowledgeGraph
-    graph = KnowledgeGraph(
+    return KnowledgeGraph(
         schema_version=SCHEMA_VERSION,
         project_name=model.project_name,
         as_version=model.as_version,
@@ -73,19 +137,74 @@ def run_generate(
         flow_diagrams={},
     )
 
-    # 5. AI enrichment (Level 2+)
-    if ai_enabled and level >= 2:
-        from as_docs.enricher.ai_enricher import enrich_graph
-        ai_stats = enrich_graph(graph, level=level, config=config)
-        setattr(graph, "_ai_stats", ai_stats)
 
-    # 6. Generate outputs
-    output_dir = Path(config.output.docs_dir)
-    generate_json(graph, output_dir)
-    generate_all_markdown(graph, output_dir)
-    generate_llms_txt(graph, output_dir)
+def _build_scoped_graph(
+    config: Config,
+    model: ProjectModel,
+    level: int,
+    scope: str,
+    target_pous: set[str],
+) -> KnowledgeGraph:
+    prev = load_graph(config)
+    if prev is None:
+        graph = _build_full_graph(model, config=config, level=level)
+        setattr(graph, "_scoped_fallback_full", True)
+        return graph
 
-    return graph
+    prev.project_name = model.project_name
+    prev.as_version = model.as_version
+    prev.active_configuration = model.active_configuration
+    prev.generated_at = datetime.now(timezone.utc).isoformat()
+    prev.level = level
+    prev.tasks = model.tasks
+    prev.global_vars = model.global_vars
+    prev.data_types = model.data_types
+
+    # changed scope can resolve to no stale files; keep previous graph content.
+    if not target_pous and scope == "changed":
+        return prev
+
+    known_pous = set(model.pous.keys())
+    known_vars = set(model.global_vars.keys())
+    ext_prefixes = config.scanner.external_lib_prefixes
+    scoped_analysis: list[STAnalysisResult] = []
+    for st_file in model.st_files:
+        if st_file.pou_name not in target_pous:
+            continue
+        result = analyze_st(st_file, known_pous, known_vars, ext_prefixes)
+        scoped_analysis.append(result)
+
+        pou = model.pous.get(st_file.pou_name)
+        if pou and result.instances:
+            pou.instances = result.instances
+
+    for pou_name in target_pous:
+        if pou_name in model.pous:
+            prev.pous[pou_name] = model.pous[pou_name]
+
+    scoped_edges = build_edges(model, scoped_analysis)
+    prev.edges = _merge_scoped_edges(prev.edges, scoped_edges, target_pous)
+
+    return prev
+
+
+def _merge_scoped_edges(
+    existing_edges: list[Edge],
+    scoped_edges: list[Edge],
+    target_pous: set[str],
+) -> list[Edge]:
+    kept = [
+        e
+        for e in existing_edges
+        if e.source not in target_pous
+        and not (e.edge_type in {"CALLS", "INSTANCE_OF"} and e.target in target_pous)
+    ]
+
+    merged = kept + scoped_edges
+    dedup: dict[tuple[str, str, str], Edge] = {}
+    for edge in merged:
+        dedup[(edge.source, edge.target, edge.edge_type)] = edge
+    return list(dedup.values())
 
 
 def load_graph(config: Config) -> KnowledgeGraph | None:

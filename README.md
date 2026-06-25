@@ -96,6 +96,10 @@ as-docs install-hook                      # git post-commit hook (planned)
 as-docs diff HEAD~1                       # changed POUs since commit (planned)
 ```
 
+Scoped behavior notes:
+- `as-docs upgrade --to N --pou NAME` performs scoped regeneration for the selected POU.
+- MCP `regenerate(scope)` supports `all`, `changed`, and `pou:NAME`, and returns touched POU metadata.
+
 ## Configuration
 
 Copy `.as-docs.yaml.example` to `.as-docs.yaml` in your AS project root and edit as needed.
@@ -201,7 +205,7 @@ Anthropic provider reads the key from `ai.api_key_env` (for example `ANTHROPIC_A
 - Implemented action tools: `regenerate`, `get_cache_status`, `upgrade`
 - Implemented level-aware MCP responses with `status: partial`, `available_level`, `requested_level`, and upgrade hints when a higher level is required
 - Implemented MCP payload + behavior tests for Phase 3 (`tests/test_phase3_mcp_server.py`)
-- Current limitation: scoped `regenerate` (`changed`, `pou:NAME`) and `upgrade --pou` routes are exposed but currently execute full regeneration with an explicit warning until true scoped execution is added
+- Implemented scoped regeneration for `regenerate(scope)` and scoped CLI upgrades via `upgrade --pou`
 - Current limitation: `watch`, `install-hook`, and `diff` commands are exposed but currently not implemented
 - Current limitation: Level 4 flow-diagram pipeline is planned but not yet wired in generation
 

@@ -171,6 +171,8 @@ def generate(ctx: click.Context, level: int | None, no_ai: bool, config_path: st
 @click.option("--config", "config_path", default=None, type=click.Path())
 def upgrade(to_level: int, pou: str | None, config_path: str | None) -> None:
     """Upgrade documentation to a higher level."""
+    from as_docs.engine import run_generate
+
     cfg = _load_cfg(config_path)
     if not cfg.ai.enabled:
         click.echo("❌  AI is disabled in config. Set ai.enabled: true", err=True)
@@ -178,7 +180,27 @@ def upgrade(to_level: int, pou: str | None, config_path: str | None) -> None:
 
     scope = f"pou:{pou}" if pou else "all"
     click.echo(f"⬆️   Upgrading to Level {to_level} (scope: {scope})...")
-    click.echo("ℹ️   AI enrichment not yet implemented — run 'as-docs generate' for now.")
+
+    ai_enabled = bool(cfg.ai.enabled and to_level >= 2)
+    try:
+        graph = run_generate(cfg, level=to_level, ai_enabled=ai_enabled, scope=scope)
+        meta = getattr(graph, "_regen_meta", {})
+        touched = ", ".join(meta.get("touched_pous", [])) or "—"
+        click.echo(f"\n✅  Upgrade complete — level {graph.level}")
+        click.echo(f"📌  Scope: {meta.get('scope', scope)}")
+        click.echo(f"🧩  Touched POUs: {touched}")
+        click.echo(f"⏱️   Elapsed: {meta.get('elapsed_seconds', 0.0)}s")
+        if meta.get("fallback_full"):
+            click.echo("ℹ️   No prior graph found; executed full regeneration to establish baseline.")
+    except ValueError as e:
+        click.echo(f"❌  {e}", err=True)
+        sys.exit(1)
+    except FileNotFoundError as e:
+        click.echo(f"❌  {e}", err=True)
+        sys.exit(1)
+    except RuntimeError as e:
+        click.echo(f"❌  {e}", err=True)
+        sys.exit(1)
 
 
 # ---------------------------------------------------------------------------

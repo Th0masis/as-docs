@@ -161,6 +161,7 @@ Once you authenticate in the browser the token is cached at
 - AI issues: run `as-docs -v generate --level 3` and check `Resolved GitHub credential source: ...`.
   - If source is `none`, follow the authentication options in section 8 above.
 - `as-docs watch`, `as-docs install-hook`, and `as-docs diff` are currently planned and may print "not yet implemented" in this version.
+- Scoped upgrade is available: `as-docs upgrade --to 3 --pou MainProgram`.
 
 ## Recommended daily workflow
 

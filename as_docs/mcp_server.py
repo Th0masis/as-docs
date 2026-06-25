@@ -401,34 +401,31 @@ def regenerate_payload(config: Config, scope: str = "all") -> dict[str, Any]:
     if scope != "all" and scope != "changed" and not scope.startswith(valid_prefix):
         raise ValueError("Invalid scope. Use one of: all, changed, pou:{name}.")
 
-    stale_before = get_staleness(config)
     prev = load_graph(config)
     target_level = prev.level if prev else config.output.default_level
     ai_enabled = bool(config.ai.enabled and target_level >= 2)
 
-    graph = run_generate(config, level=target_level, ai_enabled=ai_enabled)
+    graph = run_generate(config, level=target_level, ai_enabled=ai_enabled, scope=scope)
     stats = getattr(graph, "_ai_stats", None)
-
-    changed_count = len(graph.pous)
-    if scope == "changed":
-        changed_count = sum(1 for state in stale_before.values() if state in {"stale", "missing"})
-    if scope.startswith(valid_prefix):
-        changed_count = 1
+    meta = getattr(graph, "_regen_meta", {})
+    touched = list(meta.get("touched_pous", []))
 
     response = {
         "status": "ok",
         **_meta(graph),
         "data": {
-            "scope": scope,
-            "scanned_pous": len(graph.pous),
-            "changed_pous": changed_count,
+            "scope": meta.get("scope", scope),
+            "scanned_pous": int(meta.get("scanned_pous", len(graph.pous))),
+            "changed_pous": len(touched),
+            "touched_pous": touched,
+            "elapsed_seconds": float(meta.get("elapsed_seconds", 0.0)),
             "ai_calls": int(getattr(stats, "misses", 0)) if stats is not None else 0,
             "cache_hits": int(getattr(stats, "hits", 0)) if stats is not None else 0,
         },
     }
 
-    if scope != "all":
-        response["warning"] = "Incremental regeneration is not available yet; full project regeneration was executed."
+    if meta.get("fallback_full"):
+        response["warning"] = "No prior graph found for scoped operation; executed a full baseline regeneration."
 
     return response
 
@@ -465,20 +462,24 @@ def upgrade_payload(config: Config, to_level: int, pou: str | None = None) -> di
         raise ValueError("Target level must be between 1 and 4.")
 
     ai_enabled = bool(config.ai.enabled and to_level >= 2)
-    graph = run_generate(config, level=to_level, ai_enabled=ai_enabled)
+    scope = f"pou:{pou}" if pou else "all"
+    graph = run_generate(config, level=to_level, ai_enabled=ai_enabled, scope=scope)
+    meta = getattr(graph, "_regen_meta", {})
 
     response = {
         "status": "ok",
         **_meta(graph),
         "data": {
             "target_level": to_level,
-            "scope": f"pou:{pou}" if pou else "all",
+            "scope": meta.get("scope", scope),
+            "touched_pous": list(meta.get("touched_pous", [])),
+            "elapsed_seconds": float(meta.get("elapsed_seconds", 0.0)),
             "upgraded": True,
         },
     }
 
-    if pou:
-        response["warning"] = "Single-POU upgrades are not available yet; full project regeneration was executed."
+    if meta.get("fallback_full"):
+        response["warning"] = "No prior graph found for scoped upgrade; executed a full baseline regeneration."
 
     return response
 
