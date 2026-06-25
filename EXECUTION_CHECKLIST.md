@@ -74,17 +74,17 @@ Evidence used for verification:
 #### 3) Phase 5 template deliverables
 - Priority: P1
 - Estimate: 0.5-1 day
-- Status: [ ]
+- Status: [x]
 - Tasks:
-  - [ ] Add copilot/mcp/as-docs/mcp.json
-  - [ ] Add copilot/mcp/as-docs/README.md
-  - [ ] Add template/.github/skills/as-docs/SKILL.md
-  - [ ] Add template/.github/instructions/as-project-documentation.instructions.md
-  - [ ] Add template/.github/collections/as-project-documentation.collection.yml
-  - [ ] Register as-docs MCP in template/.github/agents/as-project.agent.md
+  - [x] Add copilot/mcp/as-docs/mcp.json
+  - [x] Add copilot/mcp/as-docs/README.md
+  - [x] Add template/.github/skills/as-docs/SKILL.md
+  - [x] Add template/.github/instructions/as-project-documentation.instructions.md
+  - [x] Add template/.github/collections/as-project-documentation.collection.yml
+  - [x] Register as-docs MCP in template/.github/agents/as-project.agent.md
 - Done criteria:
-  - [ ] as-docs appears as a first-class option alongside existing MCPs.
-  - [ ] Template docs include setup + usage steps.
+  - [x] as-docs appears as a first-class option alongside existing MCPs.
+  - [x] Template docs include setup + usage steps.
 
 #### 4) Implement planned init MCP helper option
 - Priority: P1

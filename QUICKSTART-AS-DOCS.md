@@ -164,6 +164,7 @@ Once you authenticate in the browser the token is cached at
 - Scoped upgrade is available: `as-docs upgrade --to 3 --pou MainProgram`.
 - `as-docs watch`, `as-docs install-hook`, and `as-docs diff` are now implemented for Phase 4 workflows.
 - `as-docs watch` batches rapid save events and regenerates once after files settle.
+- The project template now includes `as-docs` MCP and Copilot asset entries under `agentic-engineering-in-automation-studio/copilot/`.
 
 ## Recommended daily workflow
 

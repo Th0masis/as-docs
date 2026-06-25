@@ -208,6 +208,7 @@ Anthropic provider reads the key from `ai.api_key_env` (for example `ANTHROPIC_A
 - Implemented scoped regeneration for `regenerate(scope)` and scoped CLI upgrades via `upgrade --pou`
 - Implemented `as-docs diff`, `as-docs install-hook`, and `as-docs watch` for Phase 4 git integration
 - `as-docs watch` now batches file events and regenerates once after the debounce window settles
+- Implemented Phase 5 template integration for `as-docs` MCP and GitHub Copilot assets
 - Current limitation: Level 4 flow-diagram pipeline is planned but not yet wired in generation
 
 See `EXECUTION_CHECKLIST.md` for the live prioritized execution tracker.
