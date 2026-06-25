@@ -735,7 +735,7 @@ If requested data is not yet generated at sufficient level:
 ### Distribution
 
 - **Phase 3 (current):** installed via `pipx install as-docs` (Python package on PyPI). Invoked as a subprocess by MCP clients.
-- **Phase 7 (later):** prebuilt standalone `.exe` placed under `%APPDATA%\as-docs-mcp\as-docs-server.exe` for parity with sibling MCPs (`as-help-mcp`, `br-community-mcp`).
+- **Phase 7 (implemented helper):** `scripts/build_standalone.py` generates a PyInstaller build plan for a standalone `.exe` placed under `%APPDATA%\as-docs-mcp\as-docs-server.exe` for parity with sibling MCPs (`as-help-mcp`, `br-community-mcp`).
 
 **`mcp.json` shape** (mirrors the agentic-engineering template convention):
 ```json
@@ -951,7 +951,7 @@ Phase 6 — Level 4 Flow Diagrams [planned]         ~1.5 weeks
   └── Cross-POU sequence diagram generator
   Target milestone: behavioral flow diagrams for all non-trivial POUs
 
-Phase 7 — Prebuilt MCP Binary (optional, planned) ~0.5 weeks
+Phase 7 — Prebuilt MCP Binary (optional, helper implemented) ~0.5 weeks
   └── Package as standalone .exe under %APPDATA%\as-docs-mcp\ for parity
       with as-help-mcp / br-community-mcp
   Target milestone: zero-Python install for teams already using sibling MCPs

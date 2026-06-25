@@ -118,13 +118,13 @@ Evidence used for verification:
 #### 6) Phase 7 prebuilt executable packaging
 - Priority: P3
 - Estimate: 0.5-1 day
-- Status: [ ]
+- Status: [x]
 - Tasks:
-  - [ ] Define packaging approach for standalone executable.
-  - [ ] Add install path and update instructions.
-  - [ ] Validate parity with pipx behavior.
+  - [x] Define packaging approach for standalone executable.
+  - [x] Add install path and update instructions.
+  - [x] Validate parity with pipx behavior.
 - Done criteria:
-  - [ ] Team can run MCP server without local Python setup.
+  - [x] Team can run MCP server without local Python setup.
 
 ## Testing checklist to run after each milestone
 - [ ] py -m pytest -q

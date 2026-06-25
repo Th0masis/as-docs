@@ -19,11 +19,18 @@ Parses AS project files, extracts structural and semantic information, optionall
 - **Level 4** — Flow diagrams: parser-first behavioral Mermaid diagrams with AI enrichment fallback
 - **AI cache** — Provider/model-separated cache for Level 2 and Level 3 enrichment
 - **MCP server** — FastMCP server for AI agent integration (Claude Code, VS Code Copilot)
+- **Standalone binary** — optional PyInstaller build for a zero-Python `as-docs-server.exe`
 
 ## Installation
 
 ```bash
 pipx install as-docs
+```
+
+For the optional standalone build tooling:
+
+```bash
+pip install -e .[standalone]
 ```
 
 Or for development:
@@ -33,6 +40,13 @@ git clone <repo>
 cd as-docs
 pip install -e .
 ```
+
+## How to Use
+
+1. Run `as-docs init` inside an Automation Studio project to create `.as-docs.yaml`.
+2. Run `as-docs generate --no-ai` for a fast Level 1 pass, or `as-docs generate` for the default Level 3 output.
+3. Use `as-docs status` to check freshness and `as-docs serve` when connecting through MCP clients.
+4. For iterative updates, use `as-docs upgrade --to 3 --pou MainProgram` or `as-docs watch`.
 
 ## Quick Start
 
@@ -69,6 +83,24 @@ as-docs status
 as-docs serve                   # stdio (default, used by MCP clients)
 as-docs serve --http --port 8765
 ```
+
+## Standalone Binary (Phase 7)
+
+The planned standalone executable uses PyInstaller and installs under the same Windows app-data convention as the sibling MCP tools:
+
+- Windows default: `%APPDATA%\as-docs-mcp\as-docs-server.exe`
+- Linux/macOS default: `~/.local/share/as-docs-mcp/as-docs-server`
+
+Build a local binary with:
+
+```bash
+python scripts/build_standalone.py --dry-run
+python scripts/build_standalone.py
+```
+
+If you only want to inspect the plan, keep `--dry-run`. The helper prints the exact PyInstaller command and output paths.
+
+The standalone build is optional. Normal development and MCP use still run through the Python package and `as-docs serve`.
 
 Add to `.vscode/mcp.json`:
 ```json
@@ -211,6 +243,7 @@ Anthropic provider reads the key from `ai.api_key_env` (for example `ANTHROPIC_A
 - `as-docs watch` now batches file events and regenerates once after the debounce window settles
 - Implemented Phase 5 template integration for `as-docs` MCP and GitHub Copilot assets
 - Implemented Level 4 flow-diagram pipeline with parser-first extraction, Mermaid output, and AI narrative fallback
+- Implemented the standalone packaging plan and build helper for a PyInstaller-based `as-docs-server` executable
 
 See `EXECUTION_CHECKLIST.md` for the live prioritized execution tracker.
 

@@ -25,10 +25,6 @@ as-docs init
 ```
 
 What this does:
-- Finds project root (must contain Logical and Physical folders)
-- Creates .as-docs.yaml
-- Adds .as-docs-cache/ and docs/as-docs/ to .gitignore
-- Use `as-docs init --mcp` to also create `.vscode/mcp.json` with an `as-docs` MCP entry.
 
 ## 3) Generate documentation
 
@@ -105,11 +101,6 @@ If config auto-detection is not reliable for your setup, pass config path explic
 
 ## 7) First MCP queries to try
 
-- project overview
-- list all POUs
-- show call graph for MainProgram
-- find readers and writers of gMotorSpeed
-- show cross-task data flow
 
 ## 8) GitHub Authentication
 
@@ -163,11 +154,27 @@ Once you authenticate in the browser the token is cached at
 - MCP server not visible in chat: reload VS Code window or restart chat/MCP session after editing `mcp.json`.
 - AI issues: run `as-docs -v generate --level 3` and check `Resolved GitHub credential source: ...`.
   - If source is `none`, follow the authentication options in section 8 above.
-- `as-docs watch`, `as-docs install-hook`, and `as-docs diff` are currently planned and may print "not yet implemented" in this version.
 - Scoped upgrade is available: `as-docs upgrade --to 3 --pou MainProgram`.
 - `as-docs watch`, `as-docs install-hook`, and `as-docs diff` are now implemented for Phase 4 workflows.
 - `as-docs watch` batches rapid save events and regenerates once after files settle.
 - The project template now includes `as-docs` MCP and Copilot asset entries under `agentic-engineering-in-automation-studio/copilot/`.
+
+## 10) Optional standalone build
+
+If you want a zero-Python executable for MCP deployment, install the standalone extra and inspect the build plan:
+
+```bash
+pip install -e .[standalone]
+python scripts/build_standalone.py --dry-run
+```
+
+Default Windows output: `%APPDATA%\as-docs-mcp\as-docs-server.exe`
+
+Run the actual build only after confirming PyInstaller is installed:
+
+```bash
+python scripts/build_standalone.py
+```
 
 ## Recommended daily workflow
 

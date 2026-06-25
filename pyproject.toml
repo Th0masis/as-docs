@@ -27,6 +27,9 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
+[project.optional-dependencies]
+standalone = ["pyinstaller>=6.0"]
+
 [project.scripts]
 as-docs = "as_docs.cli:cli"
 
