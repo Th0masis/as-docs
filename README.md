@@ -16,7 +16,7 @@ Parses AS project files, extracts structural and semantic information, optionall
 - **Level 1** — Project map: task list, call graph, global variables, data types (zero AI calls, instant)
 - **Level 2** — Task enrichment pipeline: AI-generated task summaries stored in the knowledge graph and reused via cache
 - **Level 3** — POU enrichment pipeline: AI-generated POU descriptions, responsibilities, patterns, and notes stored in the knowledge graph
-- **Level 4** — Flow diagrams (planned): parser-first behavioral Mermaid diagrams with AI enrichment
+- **Level 4** — Flow diagrams: parser-first behavioral Mermaid diagrams with AI enrichment fallback
 - **AI cache** — Provider/model-separated cache for Level 2 and Level 3 enrichment
 - **MCP server** — FastMCP server for AI agent integration (Claude Code, VS Code Copilot)
 
@@ -210,7 +210,7 @@ Anthropic provider reads the key from `ai.api_key_env` (for example `ANTHROPIC_A
 - Implemented `as-docs diff`, `as-docs install-hook`, and `as-docs watch` for Phase 4 git integration
 - `as-docs watch` now batches file events and regenerates once after the debounce window settles
 - Implemented Phase 5 template integration for `as-docs` MCP and GitHub Copilot assets
-- Current limitation: Level 4 flow-diagram pipeline is planned but not yet wired in generation
+- Implemented Level 4 flow-diagram pipeline with parser-first extraction, Mermaid output, and AI narrative fallback
 
 See `EXECUTION_CHECKLIST.md` for the live prioritized execution tracker.
 

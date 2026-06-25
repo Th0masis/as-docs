@@ -101,17 +101,17 @@ Evidence used for verification:
 #### 5) Build Level 4 parser-first flow pipeline
 - Priority: P2
 - Estimate: 2-3 days
-- Status: [ ]
+- Status: [x]
 - Tasks:
-  - [ ] Add analyzer/flow_extractor.py (CASE/IF/loop extraction).
-  - [ ] Add generator/flow_diagram_gen.py (Mermaid generation from FlowNodes).
-  - [ ] Add confidence scoring (HIGH/MEDIUM/LOW).
-  - [ ] Add AI enrichment fallback for labels/narratives.
-  - [ ] Populate graph.flow_diagrams during level 4 generate.
-  - [ ] Ensure MCP get_flow_diagram returns real diagrams when level=4 docs exist.
+  - [x] Add analyzer/flow_extractor.py (CASE/IF/loop extraction).
+  - [x] Add generator/flow_diagram_gen.py (Mermaid generation from FlowNodes).
+  - [x] Add confidence scoring (HIGH/MEDIUM/LOW).
+  - [x] Add AI enrichment fallback for labels/narratives.
+  - [x] Populate graph.flow_diagrams during level 4 generate.
+  - [x] Ensure MCP get_flow_diagram returns real diagrams when level=4 docs exist.
 - Done criteria:
-  - [ ] Non-trivial POUs at level 4 produce stored flow diagrams.
-  - [ ] flow diagram output includes confidence + source.
+  - [x] Non-trivial POUs at level 4 produce stored flow diagrams.
+  - [x] flow diagram output includes confidence + source.
 
 ### P3 - Optional distribution hardening
 

@@ -15,6 +15,7 @@ from as_docs.scanner.project_scanner import scan_project
 from as_docs.analyzer.st_analyzer import analyze_st, STAnalysisResult
 from as_docs.analyzer.call_graph import build_edges
 from as_docs.generator.json_gen import generate_json
+from as_docs.generator.flow_diagram_gen import build_flow_diagram
 from as_docs.generator.markdown_gen import generate_all_markdown
 from as_docs.generator.llms_txt_gen import generate_llms_txt
 
@@ -61,6 +62,9 @@ def run_generate(
         from as_docs.enricher.ai_enricher import enrich_graph
         ai_stats = enrich_graph(graph, level=level, config=config)
         setattr(graph, "_ai_stats", ai_stats)
+
+    if level >= 4:
+        _populate_flow_diagrams(graph, model, ai_enabled=ai_enabled, scope=scope, target_pous=target_pous)
 
     # 6. Generate outputs
     output_dir = Path(config.output.docs_dir)
@@ -205,6 +209,43 @@ def _merge_scoped_edges(
     for edge in merged:
         dedup[(edge.source, edge.target, edge.edge_type)] = edge
     return list(dedup.values())
+
+
+def _populate_flow_diagrams(
+    graph: KnowledgeGraph,
+    model: ProjectModel,
+    *,
+    ai_enabled: bool,
+    scope: str,
+    target_pous: set[str],
+) -> None:
+    st_sources: dict[str, str] = {}
+    for st_file in model.st_files:
+        st_sources[st_file.pou_name] = st_file.source
+        st_sources[st_file.path.parent.name] = st_file.source
+        st_sources[st_file.path.stem] = st_file.source
+    pou_names = target_pous if scope != "all" else set(graph.pous.keys())
+
+    if scope == "changed" and not pou_names:
+        pou_names = set(graph.flow_diagrams.keys()) or set(graph.pous.keys())
+
+    if scope != "all" and graph.flow_diagrams:
+        next_flow_diagrams = dict(graph.flow_diagrams)
+    else:
+        next_flow_diagrams = {}
+
+    for pou_name in sorted(pou_names):
+        pou = graph.pous.get(pou_name)
+        source = st_sources.get(pou_name)
+        if pou is None or source is None or pou.is_external_library:
+            continue
+
+        narrative_hint = pou.description if ai_enabled else ""
+        diagram = build_flow_diagram(pou_name, source, ai_enabled=ai_enabled, narrative_hint=narrative_hint)
+        if diagram is not None:
+            next_flow_diagrams[pou_name] = diagram
+
+    graph.flow_diagrams = next_flow_diagrams
 
 
 def load_graph(config: Config) -> KnowledgeGraph | None:

@@ -5,6 +5,7 @@ from pathlib import Path
 from as_docs.model.graph import KnowledgeGraph
 from as_docs.analyzer.xref_builder import build_xrefs
 from as_docs.generator.diagram_gen import generate_architecture_diagram, generate_data_flow_diagram
+from as_docs.generator.flow_diagram_gen import generate_flow_markdown
 
 
 def generate_all_markdown(graph: KnowledgeGraph, output_dir: Path) -> list[Path]:
@@ -23,6 +24,9 @@ def generate_all_markdown(graph: KnowledgeGraph, output_dir: Path) -> list[Path]
 
     if graph.level >= 3:
         produced.extend(_write_pou_pages(graph, output_dir))
+
+    if graph.level >= 4:
+        produced.extend(generate_flow_markdown(graph, output_dir))
 
     return produced
 

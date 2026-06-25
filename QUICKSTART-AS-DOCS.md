@@ -50,8 +50,10 @@ Useful options:
 as-docs generate --level 1
 as-docs generate --level 2
 as-docs generate --level 3
-as-docs generate --level 4  # accepted, Level 4 flow pipeline is still planned
+as-docs generate --level 4  # adds flow diagrams under docs/as-docs/pou/*.flow.md
 ```
+
+Level 4 now adds parser-first flow diagrams under `docs/as-docs/pou/*.flow.md` and in `knowledge_graph.json`.
 
 ## 4) Check status and freshness
 
