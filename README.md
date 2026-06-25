@@ -8,6 +8,7 @@ Parses AS project files, extracts structural and semantic information, optionall
 
 - `README.md` — quick start, CLI commands, configuration, and current implementation status
 - `as-docs-architecture.md` — full architecture, data model, implementation phases, and decisions
+- `EXECUTION_CHECKLIST.md` — live execution tracker for prioritized remaining work
 - `.as-docs.yaml.example` — complete configuration template with comments
 
 ## Features
@@ -15,7 +16,7 @@ Parses AS project files, extracts structural and semantic information, optionall
 - **Level 1** — Project map: task list, call graph, global variables, data types (zero AI calls, instant)
 - **Level 2** — Task enrichment pipeline: AI-generated task summaries stored in the knowledge graph and reused via cache
 - **Level 3** — POU enrichment pipeline: AI-generated POU descriptions, responsibilities, patterns, and notes stored in the knowledge graph
-- **Level 4** — Flow diagrams: parser-first behavioral Mermaid diagrams with AI enrichment
+- **Level 4** — Flow diagrams (planned): parser-first behavioral Mermaid diagrams with AI enrichment
 - **AI cache** — Provider/model-separated cache for Level 2 and Level 3 enrichment
 - **MCP server** — FastMCP server for AI agent integration (Claude Code, VS Code Copilot)
 
@@ -60,7 +61,7 @@ as-docs status
 | 1 | 0 | seconds | overview, architecture, global vars, data types |
 | 2 | 1 per task | ~45s | enriched task data in `knowledge_graph.json`, data flow diagram |
 | 3 | 1 per POU | ~3min cold | enriched POU data in `knowledge_graph.json`, complete knowledge graph |
-| 4 | 0–1 per POU | ~6min cold | behavioral flow diagrams |
+| 4 | 0–1 per POU | planned | behavioral flow diagrams (Phase 6) |
 
 ## MCP Server
 
@@ -90,9 +91,9 @@ as-docs upgrade --to N [--pou NAME]       # upgrade to higher level
 as-docs status                            # freshness report
 as-docs cache clear [--pou NAME]          # clear AI cache
 as-docs serve [--http --port 8765]        # MCP server
-as-docs watch [--level N]                 # daemon mode
-as-docs install-hook                      # git post-commit hook
-as-docs diff HEAD~1                       # changed POUs since commit
+as-docs watch [--level N]                 # daemon mode (planned)
+as-docs install-hook                      # git post-commit hook (planned)
+as-docs diff HEAD~1                       # changed POUs since commit (planned)
 ```
 
 ## Configuration
@@ -170,11 +171,14 @@ Copilot provider can authenticate via the Copilot SDK session (Copilot CLI backe
 
 | Priority | Source | Notes |
 |----------|--------|-------|
-| 1 | Env var named by `ai.api_key_env` | Default: `GITHUB_TOKEN` |
-| 2 | `GH_TOKEN` env var | Standard GitHub CLI variable |
-| 3 | `gh auth token` | GitHub CLI token |
-| 4 | `git credential fill` (`https://github.com`) | Git Credential Manager / git credential helper |
-| 5 | Windows Credential Manager target `vscode.github-authentication` | VS Code GitHub Authentication extension session |
+| 1 | Direct token in `ai.api_key_env` | If value looks like `ghp_...`/`github_pat_...` |
+| 2 | Env var named by `ai.api_key_env` | Default: `GITHUB_TOKEN` |
+| 3 | `GH_TOKEN`/`GITHUB_TOKEN` env var | Standard GitHub variables |
+| 4 | `gh auth token` | GitHub CLI token |
+| 5 | `git credential fill` (`https://github.com`) | Git Credential Manager / git credential helper |
+| 6 | Windows Credential Manager target `vscode.github-authentication` | VS Code GitHub Authentication extension session |
+| 7 | Cached device-flow token (`~/.config/as-docs/github_token`) | Reuses prior interactive login |
+| 8 | Interactive OAuth device flow | Requires `ai.oauth_client_id` or `AS_DOCS_OAUTH_CLIENT_ID` |
 
 If a token is found, `as-docs` performs a best-effort GitHub preflight (login + Copilot entitlement check). Preflight is non-blocking: failures are logged and the provider continues with SDK auth.
 
@@ -190,7 +194,7 @@ The raw token is **never stored on the provider object** — the Copilot SDK han
 
 Anthropic provider reads the key from `ai.api_key_env` (for example `ANTHROPIC_API_KEY`) and initializes the Anthropic SDK directly.
 
-## Current Phase 3 Status
+## Current Status (2026-06-25)
 
 - Implemented: FastMCP server with stdio and HTTP transports (`as-docs serve`, `as-docs serve --http --port 8765`)
 - Implemented read tools: `get_overview`, `get_pou_list`, `get_pou`, `get_task`, `find_variable`, `get_data_flow`, `get_call_graph`, `get_global_vars`, `search`, `get_flow_diagram`
@@ -198,6 +202,10 @@ Anthropic provider reads the key from `ai.api_key_env` (for example `ANTHROPIC_A
 - Implemented level-aware MCP responses with `status: partial`, `available_level`, `requested_level`, and upgrade hints when a higher level is required
 - Implemented MCP payload + behavior tests for Phase 3 (`tests/test_phase3_mcp_server.py`)
 - Current limitation: scoped `regenerate` (`changed`, `pou:NAME`) and `upgrade --pou` routes are exposed but currently execute full regeneration with an explicit warning until true scoped execution is added
+- Current limitation: `watch`, `install-hook`, and `diff` commands are exposed but currently not implemented
+- Current limitation: Level 4 flow-diagram pipeline is planned but not yet wired in generation
+
+See `EXECUTION_CHECKLIST.md` for the live prioritized execution tracker.
 
 ## Requirements
 

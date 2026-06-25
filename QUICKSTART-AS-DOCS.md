@@ -49,7 +49,7 @@ Useful options:
 as-docs generate --level 1
 as-docs generate --level 2
 as-docs generate --level 3
-as-docs generate --level 4
+as-docs generate --level 4  # accepted, Level 4 flow pipeline is still planned
 ```
 
 ## 4) Check status and freshness
@@ -160,6 +160,7 @@ Once you authenticate in the browser the token is cached at
 - MCP server not visible in chat: reload VS Code window or restart chat/MCP session after editing `mcp.json`.
 - AI issues: run `as-docs -v generate --level 3` and check `Resolved GitHub credential source: ...`.
   - If source is `none`, follow the authentication options in section 8 above.
+- `as-docs watch`, `as-docs install-hook`, and `as-docs diff` are currently planned and may print "not yet implemented" in this version.
 
 ## Recommended daily workflow
 

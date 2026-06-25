@@ -2,6 +2,8 @@
 
 > **Purpose of this document:** Complete reference for AI agents and developers cooperating on the `as-docs` project. Contains all architectural decisions, data models, file structures, and implementation phases. Do not contradict decisions documented here without explicit confirmation from the project owner.
 
+> **Status note (2026-06-25):** This document includes both implemented behavior and target-state roadmap items. For the current implementation delta, see `README.md` (Current Status) and the live tracker `EXECUTION_CHECKLIST.md`.
+
 ---
 
 ## 1. Project Overview
@@ -42,7 +44,7 @@ as-docs/                              monorepo — one version number
 │   │   ├── st_analyzer.py            regex-based ST code analysis
 │   │   ├── call_graph.py             builds POU call hierarchy
 │   │   ├── xref_builder.py           variable cross-references (read/write)
-│   │   └── flow_extractor.py         CASE/IF/loop → control flow structure (Level 4)
+│   │   └── flow_extractor.py         CASE/IF/loop → control flow structure (Level 4, planned)
 │   │
 │   ├── model/                        core data model
 │   │   ├── project.py                ProjectModel dataclass tree
@@ -56,7 +58,7 @@ as-docs/                              monorepo — one version number
 │   ├── generator/                    Layer 4: output rendering
 │   │   ├── markdown_gen.py           per-POU and per-task .md files
 │   │   ├── diagram_gen.py            Mermaid structural diagrams
-│   │   ├── flow_diagram_gen.py       Mermaid behavioral flow diagrams (Level 4)
+│   │   ├── flow_diagram_gen.py       Mermaid behavioral flow diagrams (Level 4, planned)
 │   │   ├── json_gen.py               knowledge_graph.json
 │   │   └── llms_txt_gen.py           llms.txt index
 │   │
@@ -140,7 +142,7 @@ scanner:
 | `.per` | `per_parser.py` | Task name, task type, cycle time, assigned programs. **Note:** `Cpu.sw` `<Task Name>` attribute is limited to 10 characters — match tasks↔programs by `Source` path attribute, not by name equality. |
 | `.var` | `var_parser.py` | Variable name, type, initial value, scope (LOCAL/GLOBAL/GVL name) |
 | `.typ` | `typ_parser.py` | STRUCT members, ENUM values, ALIAS targets |
-| `.st` | `st_analyzer.py` + `flow_extractor.py` | Calls, variable usage (read/write), control flow structure |
+| `.st` | `st_analyzer.py` (implemented) + `flow_extractor.py` (planned) | Calls, variable usage (read/write), control flow structure |
 
 `Temp/`, `Binaries/`, and `Diagnosis/` directories are always excluded from scanning.
 
@@ -706,7 +708,8 @@ Action tools:
 ```python
 regenerate(scope: Literal["all", "changed", "pou:{name}"])
   # triggers re-parse and AI enrichment
-  # "changed": only files modified since last run (uses git diff)
+  # current behavior: any scope routes to full regeneration
+  # planned: "changed" will use git diff for incremental regeneration
   # returns summary: N files scanned, M AI calls made, K cached
 
 get_cache_status()
@@ -891,65 +894,67 @@ No custom VS Code extension — IDE integration via agentic-engineering template
 
 ## 14. Implementation Phases
 
+Phase status marker: [implemented], [partial], [planned]
+
 ```
-Phase 1 — Foundation                              ~1.5 weeks
+Phase 1 — Foundation [implemented]                ~1.5 weeks
   ├── ProjectModel + KnowledgeGraph dataclasses
   ├── Project scanner (pkg, var, typ, per parsers)
   ├── ST analyzer (call graph + xref, regex + B&R heuristics)
   ├── CLI: as-docs generate --no-ai
   └── Output: basic Markdown + knowledge_graph.json
-  ✓ Milestone: run on real AS project, get structural docs
+  Target milestone: run on real AS project, get structural docs
 
-Phase 2 — AI Enrichment                           ~1 week
-  ├── AI provider abstraction (`copilot` runtime implemented, `anthropic` reserved)
+Phase 2 — AI Enrichment [implemented]             ~1 week
+  ├── AI provider abstraction (`copilot` default runtime, `anthropic` fallback runtime)
   ├── Copilot-compatible client integration (implemented)
   ├── Auto token discovery: env var → GH_TOKEN → `gh auth token` (VS Code/CLI)
   ├── GitHub API pre-flight: login resolution + Copilot entitlement check
-  ├── Anthropic client integration (deferred)
+  ├── Anthropic client integration (implemented fallback)
   ├── Hash-based cache (.as-docs-cache/, gitignored)
   ├── Per-POU description + pattern detection (Level 2 + Level 3)
   ├── Diagram generator (Mermaid structural diagrams)
   └── llms.txt generator
-  ✓ Milestone: full docs with semantic descriptions and diagrams
+  Target milestone: full docs with semantic descriptions and diagrams
 
-Phase 3 — MCP Server + Distribution              ~1 week
+Phase 3 — MCP Server + Distribution [partial]    ~1 week
   ├── FastMCP server wrapping the engine
   ├── All read tools + regenerate / upgrade tools
   ├── stdio transport (default)
   ├── HTTP transport (--http flag)
   ├── Level-aware partial responses with upgrade hints
-  ├── Claude Code config snippet generator (as-docs init --mcp-config)
+  ├── Claude Code config snippet generator (planned)
   └── pipx distribution (publish to PyPI)
-  ✓ Milestone: Claude can answer questions about AS project via MCP
+  Target milestone: Claude can answer questions about AS project via MCP
 
-Phase 4 — Git Integration                         ~0.5 weeks
+Phase 4 — Git Integration [planned]               ~0.5 weeks
   ├── gitpython: detect changed .st/.var files since last commit
   ├── as-docs diff → only regenerate stale POUs
   ├── post-commit hook installer (opt-in)
   └── as-docs status → freshness report per POU
-  ✓ Milestone: automatic incremental updates on commit
+  Target milestone: automatic incremental updates on commit
 
-Phase 5 — Template Integration                    ~0.5 weeks
+Phase 5 — Template Integration [planned]          ~0.5 weeks
   ├── copilot/mcp/as-docs/{mcp.json, README.md}
   ├── template/.github/skills/as-docs/SKILL.md
   ├── template/.github/instructions/as-project-documentation.instructions.md
   ├── template/.github/collections/as-project-documentation.collection.yml
   └── Register as-docs MCP in template/.github/agents/as-project.agent.md
-  ✓ Milestone: as-docs ships as a first-class MCP in the agentic-engineering template
+  Target milestone: as-docs ships as a first-class MCP in the agentic-engineering template
 
-Phase 6 — Level 4 Flow Diagrams                   ~1.5 weeks
+Phase 6 — Level 4 Flow Diagrams [planned]         ~1.5 weeks
   ├── flow_extractor.py (CASE → states, IF/ELSIF → branches, FOR/WHILE → loops)
   ├── Parser confidence scoring (HIGH / MEDIUM / LOW)
   ├── flow_diagram_gen.py (FlowNodes → Mermaid strings)
   ├── AI enrichment (label enrichment + narrative) + AI fallback
   ├── Confidence tagging in output (🟢 🟡 🔴)
   └── Cross-POU sequence diagram generator
-  ✓ Milestone: behavioral flow diagrams for all non-trivial POUs
+  Target milestone: behavioral flow diagrams for all non-trivial POUs
 
-Phase 7 — Prebuilt MCP Binary (optional)          ~0.5 weeks
+Phase 7 — Prebuilt MCP Binary (optional, planned) ~0.5 weeks
   └── Package as standalone .exe under %APPDATA%\as-docs-mcp\ for parity
       with as-help-mcp / br-community-mcp
-  ✓ Milestone: zero-Python install for teams already using sibling MCPs
+  Target milestone: zero-Python install for teams already using sibling MCPs
 ```
 
 ---
@@ -969,7 +974,7 @@ Phase 7 — Prebuilt MCP Binary (optional)          ~0.5 weeks
 | Multiple Physical configs | `active_configuration` in config, single config parsed | Avoids task duplication; team picks relevant config |
 | Library handling | Precompiled libs marked external; custom libs scanned | Preserves call-graph accuracy without documenting vendor internals |
 | ST parsing approach | Targeted regex + B&R naming heuristics, no full grammar | Sufficient for docs, far simpler |
-| AI provider/model | Current branch default `copilot` + `gpt-4.1`; `anthropic` reserved but not runtime-enabled | Match company Copilot-only environment while preserving future extension point |
+| AI provider/model | Current default `copilot` + `gpt-4.1`; `anthropic` runtime supported as fallback | Support Copilot-first workflow while preserving alternate provider path |
 | Cache strategy | SHA256 per file, level-aware | Incremental updates, API cost control |
 | Schema versioning | `schema_version` field in `knowledge_graph.json` | Prevents silent model mismatch after upgrades |
 | `DataType` model | Proper `DataType` + `DataTypeMember` dataclasses | Type-safe, consistent across all generators and MCP tools |
@@ -984,7 +989,7 @@ Phase 7 — Prebuilt MCP Binary (optional)          ~0.5 weeks
 | Variable metadata | `description` + `unit` parsed from `(* comment [unit] *)` | Preserves engineer intent from .var/.typ files |
 | Task name matching | Match by `Source` path, not by `Task Name` (10-char limit) | Prevents task↔program linking failures |
 | Single POU upgrade | `--pou` flag on upgrade | On-demand depth without full project cost |
-| Watch mode | `as-docs watch` via `watchdog` | Daemon-style incremental regen on file save |
+| Watch mode | `as-docs watch` via `watchdog` (planned) | Daemon-style incremental regen on file save |
 | `as-docs init` validation | Check for `Logical/` + `Physical/`, walk up tree | Prevents running in wrong directory |
 | `.gitignore` management | `init` adds `.as-docs-cache/` and `docs/as-docs/` | Developer never forgets to gitignore cache |
 | as-cli dependency | Deferred | Parser-only approach sufficient; adopt when as-cli is GA |
@@ -1030,4 +1035,4 @@ These are documented constraints of the initial release. They are known and acce
 | **Cross-project library references** | Libraries from separate AS projects referenced via project references are not followed. |
 | **Multi-POU `.st` files** | B&R AS normally puts one POU per `.st` file. If multiple `PROGRAM` / `FUNCTION_BLOCK` blocks exist in one file, each is extracted as a separate POU node. Edge case — not a primary target. |
 | **IO mapping not parsed** | Physical IO channel assignments in the hardware tree are not extracted. Variable directionality is inferred from naming conventions (di/do/ai/ao) only. |
-| **`as-docs diff` granularity** | Tracks changes at file level, not POU level. A `.st` file change marks the entire POU stale even if only a comment changed. |
+| **`as-docs diff` availability** | `as-docs diff` is part of the Phase 4 roadmap and may not be implemented in the current release. |
