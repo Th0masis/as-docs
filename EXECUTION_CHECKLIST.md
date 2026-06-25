@@ -89,12 +89,12 @@ Evidence used for verification:
 #### 4) Implement planned init MCP helper option
 - Priority: P1
 - Estimate: 0.25 day
-- Status: [ ]
+- Status: [x]
 - Tasks:
-  - [ ] Add init option to generate MCP config snippet/file as planned.
-  - [ ] Document in README and quickstart.
+  - [x] Add init option to generate MCP config snippet/file as planned.
+  - [x] Document in README and quickstart.
 - Done criteria:
-  - [ ] Fresh project can configure MCP with one command + minimal edits.
+  - [x] Fresh project can configure MCP with one command + minimal edits.
 
 ### P2 - Level 4 completion
 

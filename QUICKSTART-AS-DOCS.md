@@ -28,6 +28,7 @@ What this does:
 - Finds project root (must contain Logical and Physical folders)
 - Creates .as-docs.yaml
 - Adds .as-docs-cache/ and docs/as-docs/ to .gitignore
+- Use `as-docs init --mcp` to also create `.vscode/mcp.json` with an `as-docs` MCP entry.
 
 ## 3) Generate documentation
 

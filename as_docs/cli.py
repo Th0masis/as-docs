@@ -1,5 +1,6 @@
 """Click CLI entry points for as-docs."""
 from __future__ import annotations
+import json
 import logging
 import sys
 import time
@@ -34,7 +35,8 @@ def cli(ctx: click.Context, verbose: bool) -> None:
 
 @cli.command()
 @click.option("--http", is_flag=True, help="Configure for HTTP MCP transport.")
-def init(http: bool) -> None:
+@click.option("--mcp", is_flag=True, help="Create or update .vscode/mcp.json with an as-docs server entry.")
+def init(http: bool, mcp: bool) -> None:
     """Detect AS project root, create .as-docs.yaml, update .gitignore."""
     root = find_project_root()
     if root is None:
@@ -66,6 +68,11 @@ def init(http: bool) -> None:
     # Update .gitignore
     _update_gitignore(root)
     click.echo("✓  Updated .gitignore (.as-docs-cache/ and docs/as-docs/)")
+
+    if mcp:
+        _update_vscode_mcp(root)
+        click.echo("✓  Updated .vscode/mcp.json (as-docs MCP server)")
+
     click.echo("\nNext: as-docs generate --no-ai")
 
 
@@ -80,6 +87,33 @@ def _update_gitignore(root: Path) -> None:
     if additions:
         sep = "\n" if content and not content.endswith("\n") else ""
         gitignore.write_text(content + sep + "\n".join(additions) + "\n", encoding="utf-8")
+
+
+def _update_vscode_mcp(root: Path) -> Path:
+    vscode_dir = root / ".vscode"
+    vscode_dir.mkdir(parents=True, exist_ok=True)
+    mcp_file = vscode_dir / "mcp.json"
+
+    try:
+        payload = json.loads(mcp_file.read_text(encoding="utf-8")) if mcp_file.exists() else {}
+    except json.JSONDecodeError as exc:
+        raise click.ClickException(f"Invalid JSON in {mcp_file}: {exc}") from exc
+
+    if not isinstance(payload, dict):
+        payload = {}
+
+    servers = payload.get("servers")
+    if not isinstance(servers, dict):
+        servers = {}
+
+    servers["as-docs"] = {
+        "command": "as-docs",
+        "args": ["serve"],
+    }
+    payload["servers"] = servers
+
+    mcp_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return mcp_file
 
 
 def _default_config_content(project_name: str) -> str:

@@ -85,7 +85,7 @@ Add to `.vscode/mcp.json`:
 ## CLI Reference
 
 ```bash
-as-docs init                              # setup
+as-docs init [--http] [--mcp]             # setup
 as-docs generate [--level 1-4] [--no-ai] # generate docs
 as-docs upgrade --to N [--pou NAME]       # upgrade to higher level
 as-docs status                            # freshness report
@@ -99,6 +99,7 @@ as-docs diff HEAD~1                       # changed POUs since commit
 Scoped behavior notes:
 - `as-docs upgrade --to N --pou NAME` performs scoped regeneration for the selected POU.
 - MCP `regenerate(scope)` supports `all`, `changed`, and `pou:NAME`, and returns touched POU metadata.
+- `as-docs init --mcp` creates or updates `.vscode/mcp.json` with an `as-docs` MCP entry.
 
 ## Configuration
 
