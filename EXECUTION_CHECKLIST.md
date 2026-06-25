@@ -18,6 +18,20 @@ Source baseline: as-docs-architecture.md roadmap + current implementation scan
 - [ ] Phase 6: Level 4 flow diagrams (parser-first pipeline)
 - [ ] Phase 7: Prebuilt MCP binary (optional)
 
+## Verification snapshot (2026-06-25)
+- [x] Checklist matches current implementation status at a high level.
+- [~] Scoped regenerate/upgrade routes exist but still run full regeneration (warning path present).
+- [ ] CLI Phase 4 commands (`watch`, `install-hook`, `diff`) are still placeholders.
+- [ ] Level 4 flow extraction/generation pipeline files are not present yet.
+- [ ] Phase 5 as-docs template/MCP integration files are not present yet.
+
+Evidence used for verification:
+- `as_docs/cli.py`: `upgrade` currently prints not implemented guidance; `watch`, `install-hook`, and `diff` print not implemented.
+- `as_docs/mcp_server.py`: scope validation exists in `regenerate_payload`, but non-`all` scope still returns explicit full-regeneration warning.
+- `as_docs/engine.py`: no incremental/scoped generation path yet; generation is full scan/analyze/generate pipeline.
+- `agentic-engineering-in-automation-studio/copilot/mcp/as-docs/`: missing.
+- `as_docs/analyzer/flow_extractor.py` and `as_docs/generator/flow_diagram_gen.py`: missing.
+
 ## Priority plan
 
 ### P0 - Finish core product behavior
@@ -130,3 +144,40 @@ Source baseline: as-docs-architecture.md roadmap + current implementation scan
 4. init MCP helper option
 5. Level 4 extraction/generation pipeline
 6. Optional executable packaging
+
+## Execution workflow protocol (apply to each milestone)
+
+For each major checklist item, execute this fixed cycle before moving to the next:
+
+1. Implement
+- Make only milestone-scoped code changes.
+- Keep backward compatibility for existing CLI and MCP behavior unless explicitly changed in this checklist.
+
+2. Verify functionality (manual + automated)
+- Run targeted tests first (new/changed area).
+- Run full regression after milestone completion:
+  - `py -m pytest -q`
+- Run CLI smoke checks relevant to the milestone.
+
+3. Add/update tests
+- Add unit tests for core logic changes.
+- Add integration/CLI tests for exposed behavior changes.
+- Prefer fixture-based tests under `tests/fixtures/SampleProject/`.
+
+4. Update documentation
+- Update `README.md` command behavior and limitations.
+- Update `QUICKSTART-AS-DOCS.md` when setup/usage flow changes.
+- Update this checklist status and done criteria checkboxes.
+
+5. Commit (one commit per milestone)
+- Commit only files relevant to the milestone.
+- Suggested commit style:
+  - `feat(as-docs): <milestone outcome>`
+  - `test(as-docs): add coverage for <milestone outcome>` (optional second commit if large)
+  - `docs(as-docs): update README/quickstart for <milestone outcome>` (optional squash or separate)
+
+Release gate before starting next milestone:
+- [ ] Milestone tests pass.
+- [ ] CLI/MCP behavior manually validated.
+- [ ] Documentation updated.
+- [ ] Commit created with clear scope.
