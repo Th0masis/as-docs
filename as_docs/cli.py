@@ -2,9 +2,13 @@
 from __future__ import annotations
 import logging
 import sys
+import time
 from pathlib import Path
 
 import click
+from git import InvalidGitRepositoryError, Repo
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 from as_docs.config import Config, find_project_root, load_config
 
@@ -290,10 +294,50 @@ def serve(http: bool, port: int, config_path: str | None) -> None:
 
 @cli.command()
 @click.option("--level", default=1, show_default=True, type=int)
+@click.option("--debounce-ms", default=500, show_default=True, type=int)
 @click.option("--config", "config_path", default=None, type=click.Path())
-def watch(level: int, config_path: str | None) -> None:
+def watch(level: int, debounce_ms: int, config_path: str | None) -> None:
     """Watch for file changes and regenerate on save (daemon mode)."""
-    click.echo("⚠️   Watch mode not yet implemented.")
+    from as_docs.engine import run_generate
+
+    cfg = _load_cfg(config_path)
+    project_root = _resolve_project_root(cfg)
+    logical_root = project_root / "Logical"
+    physical_root = project_root / "Physical"
+    if not logical_root.exists():
+        click.echo("❌  Logical/ directory not found for watch mode.", err=True)
+        sys.exit(1)
+
+    ai_enabled = bool(cfg.ai.enabled and level >= 2)
+
+    def _on_change(changed_path: Path) -> None:
+        pou = _resolve_pou_name_from_path(changed_path)
+        scope = f"pou:{pou}" if pou else "changed"
+        graph = run_generate(cfg, level=level, ai_enabled=ai_enabled, scope=scope)
+        meta = getattr(graph, "_regen_meta", {})
+        touched = ", ".join(meta.get("touched_pous", [])) or "—"
+        click.echo(f"↻  Regenerated (scope={meta.get('scope', scope)}) touched={touched}")
+
+    handler = _ASDocsWatchHandler(callback=_on_change, debounce_ms=debounce_ms)
+    observer = Observer()
+    observer.schedule(handler, str(logical_root), recursive=True)
+    if physical_root.exists():
+        observer.schedule(handler, str(physical_root), recursive=True)
+
+    click.echo(f"👀  Watching {logical_root} (level {level}, debounce {debounce_ms}ms)")
+    if physical_root.exists():
+        click.echo(f"👀  Watching {physical_root} (task/config changes)")
+    click.echo("Press Ctrl+C to stop.")
+
+    observer.start()
+    try:
+        while True:
+            time.sleep(0.25)
+    except KeyboardInterrupt:
+        click.echo("\nStopping watcher...")
+    finally:
+        observer.stop()
+        observer.join(timeout=5)
 
 
 # ---------------------------------------------------------------------------
@@ -301,10 +345,59 @@ def watch(level: int, config_path: str | None) -> None:
 # ---------------------------------------------------------------------------
 
 @cli.command("install-hook")
+@click.option("--yes", is_flag=True, help="Install without confirmation prompt.")
+@click.option("--force", is_flag=True, help="Replace any existing as-docs hook block.")
 @click.option("--config", "config_path", default=None, type=click.Path())
-def install_hook(config_path: str | None) -> None:
+def install_hook(yes: bool, force: bool, config_path: str | None) -> None:
     """Install a git post-commit hook for automatic doc regeneration."""
-    click.echo("⚠️   Git hook installation not yet implemented.")
+    cfg = _load_cfg(config_path)
+    project_root = _resolve_project_root(cfg)
+
+    try:
+        repo = Repo(project_root, search_parent_directories=True)
+    except InvalidGitRepositoryError:
+        click.echo("❌  Not a git repository. Initialize git first.", err=True)
+        sys.exit(1)
+
+    repo_root = Path(repo.working_tree_dir or project_root)
+    hooks_dir = repo_root / ".git" / "hooks"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    hook_file = hooks_dir / "post-commit"
+
+    if not yes:
+        if not click.confirm(f"Install as-docs post-commit hook in {hook_file}?", default=True):
+            click.echo("Hook installation cancelled.")
+            return
+
+    marker_start = "# >>> as-docs hook start >>>"
+    marker_end = "# <<< as-docs hook end <<<"
+    hook_block = _build_post_commit_hook_block(cfg)
+
+    if hook_file.exists():
+        existing = hook_file.read_text(encoding="utf-8", errors="replace")
+    else:
+        existing = "#!/bin/sh\n"
+
+    updated, changed = _merge_hook_block(
+        existing,
+        marker_start=marker_start,
+        marker_end=marker_end,
+        block=hook_block,
+        force=force,
+    )
+
+    if not changed:
+        click.echo("✓  Hook already installed (no changes).")
+        return
+
+    hook_file.write_text(updated, encoding="utf-8")
+    try:
+        hook_file.chmod(0o755)
+    except OSError:
+        # Windows may ignore chmod for hooks; keep going.
+        pass
+
+    click.echo(f"✓  Installed post-commit hook: {hook_file}")
 
 
 # ---------------------------------------------------------------------------
@@ -316,7 +409,42 @@ def install_hook(config_path: str | None) -> None:
 @click.option("--config", "config_path", default=None, type=click.Path())
 def diff(ref: str, config_path: str | None) -> None:
     """Show which POUs changed since a git ref."""
-    click.echo("⚠️   Git diff integration not yet implemented.")
+    cfg = _load_cfg(config_path)
+    project_root = _resolve_project_root(cfg)
+
+    try:
+        repo = Repo(project_root, search_parent_directories=True)
+    except InvalidGitRepositoryError:
+        click.echo("❌  Not a git repository. Initialize git first.", err=True)
+        sys.exit(1)
+
+    repo_root = Path(repo.working_tree_dir or project_root)
+    try:
+        changed = _git_changed_files(repo, ref)
+    except Exception as exc:
+        click.echo(f"❌  Unable to diff ref '{ref}': {exc}", err=True)
+        sys.exit(1)
+
+    if not changed:
+        click.echo(f"No changed files detected between {ref} and HEAD.")
+        return
+
+    known_pous = _known_pou_names(cfg, repo_root)
+    changed_pous = _changed_pous_from_files(changed, repo_root, known_pous)
+    click.echo(f"Changed files ({len(changed)}):")
+    for path in changed:
+        click.echo(f"  - {path}")
+
+    click.echo("")
+    click.echo(f"Changed POUs ({len(changed_pous)}):")
+    for name in sorted(changed_pous):
+        click.echo(f"  - {name}")
+
+    if changed_pous:
+        click.echo("")
+        click.echo("Suggested commands:")
+        for name in sorted(changed_pous):
+            click.echo(f"  as-docs upgrade --to {cfg.git.auto_level} --pou {name}")
 
 
 # ---------------------------------------------------------------------------
@@ -329,3 +457,152 @@ def _load_cfg(config_path: str | None) -> Config:
         return load_config(p)
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
+
+
+def _resolve_project_root(cfg: Config) -> Path:
+    root = Path(cfg.project.root).resolve()
+    if (root / "Logical").is_dir() and (root / "Physical").is_dir():
+        return root
+    detected = find_project_root()
+    if detected:
+        return detected
+    raise click.ClickException(
+        "Cannot locate AS project root (Logical/ + Physical/ not found)."
+    )
+
+
+def _git_changed_files(repo: Repo, ref: str) -> list[str]:
+    output = repo.git.diff("--name-only", ref, "HEAD")
+    return [line.strip() for line in output.splitlines() if line.strip()]
+
+
+def _resolve_pou_name_from_path(path: Path) -> str | None:
+    lower_suffix = path.suffix.lower()
+    if lower_suffix not in {".st", ".prg", ".var"}:
+        return None
+    if path.parent.name == "GlobalVars":
+        return None
+    return path.parent.name
+
+
+def _is_relevant_source_path(path: Path) -> bool:
+    return path.suffix.lower() in {".st", ".prg", ".var", ".typ", ".per"}
+
+
+def _known_pou_names(cfg: Config, project_root: Path) -> set[str]:
+    from as_docs.scanner.project_scanner import scan_project
+
+    model = scan_project(cfg, project_root=project_root)
+    return set(model.pous.keys())
+
+
+def _changed_pous_from_files(
+    changed_files: list[str],
+    repo_root: Path,
+    known_pous: set[str],
+) -> set[str]:
+    changed_pous: set[str] = set()
+    for rel in changed_files:
+        path = repo_root / rel
+        parts = path.parts
+        if "Logical" not in parts:
+            if "Physical" in parts:
+                changed_pous.update(known_pous)
+            continue
+
+        logical_idx = parts.index("Logical")
+        if len(parts) <= logical_idx + 1:
+            continue
+
+        section = parts[logical_idx + 1]
+        suffix = path.suffix.lower()
+        if section == "GlobalVars" or suffix in {".typ"}:
+            changed_pous.update(known_pous)
+            continue
+
+        pou = _resolve_pou_name_from_path(path)
+        if pou and pou in known_pous:
+            changed_pous.add(pou)
+    return changed_pous
+
+
+def _build_post_commit_hook_block(cfg: Config) -> str:
+    auto_level = cfg.git.auto_level
+    return "\n".join(
+        [
+            "# >>> as-docs hook start >>>",
+            "if command -v as-docs >/dev/null 2>&1; then",
+            f"  as-docs generate --level {auto_level} >/dev/null 2>&1 || true",
+            "fi",
+            "# <<< as-docs hook end <<<",
+            "",
+        ]
+    )
+
+
+def _merge_hook_block(
+    existing: str,
+    *,
+    marker_start: str,
+    marker_end: str,
+    block: str,
+    force: bool,
+) -> tuple[str, bool]:
+    has_start = marker_start in existing
+    has_end = marker_end in existing
+
+    if has_start and has_end:
+        start_idx = existing.index(marker_start)
+        end_idx = existing.index(marker_end) + len(marker_end)
+        before = existing[:start_idx].rstrip("\n")
+        current_block = existing[start_idx:end_idx]
+        after = existing[end_idx:].lstrip("\n")
+        normalized_existing = current_block.strip()
+        normalized_new = block.strip()
+        if normalized_existing == normalized_new:
+            return existing if existing.endswith("\n") else existing + "\n", False
+        merged = "\n".join(part for part in [before, block.rstrip("\n"), after] if part) + "\n"
+        return merged, True
+
+    if has_start or has_end:
+        if not force:
+            raise click.ClickException(
+                "Found partial as-docs hook markers. Re-run with --force to replace."
+            )
+
+    base = existing.rstrip("\n")
+    merged = (base + "\n\n" + block).strip("\n") + "\n"
+    changed = marker_start not in existing
+    return merged, changed
+
+
+class _ASDocsWatchHandler(FileSystemEventHandler):
+    def __init__(self, callback, debounce_ms: int) -> None:
+        self._callback = callback
+        self._debounce_seconds = max(0.0, debounce_ms / 1000.0)
+        self._last_run = 0.0
+
+    def on_modified(self, event) -> None:
+        self._handle_event(event)
+
+    def on_created(self, event) -> None:
+        self._handle_event(event)
+
+    def on_moved(self, event) -> None:
+        self._handle_event(event)
+
+    def _handle_event(self, event) -> None:
+        if getattr(event, "is_directory", False):
+            return
+
+        src = getattr(event, "dest_path", None) or getattr(event, "src_path", "")
+        path = Path(src)
+        if not _is_relevant_source_path(path):
+            return
+
+        now = time.monotonic()
+        if now - self._last_run < self._debounce_seconds:
+            return
+
+        self._last_run = now
+        self._callback(path)

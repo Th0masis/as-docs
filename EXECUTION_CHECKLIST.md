@@ -58,16 +58,16 @@ Evidence used for verification:
 #### 2) Implement Phase 4 git commands in CLI
 - Priority: P0
 - Estimate: 1-1.5 days
-- Status: [ ]
+- Status: [x]
 - Tasks:
-  - [ ] Implement as-docs diff <ref> using gitpython.
-  - [ ] Implement install-hook (post-commit) with opt-in behavior.
-  - [ ] Implement watch mode using watchdog and incremental regenerate.
-  - [ ] Ensure status output aligns with incremental workflow.
+  - [x] Implement as-docs diff <ref> using gitpython.
+  - [x] Implement install-hook (post-commit) with opt-in behavior.
+  - [x] Implement watch mode using watchdog and incremental regenerate.
+  - [x] Ensure status output aligns with incremental workflow.
 - Done criteria:
-  - [ ] CLI commands no longer print "not yet implemented".
-  - [ ] Hook file is created/updated safely and idempotently.
-  - [ ] Diff command outputs changed POUs reliably on sample fixture + repo tests.
+  - [x] CLI commands no longer print "not yet implemented".
+  - [x] Hook file is created/updated safely and idempotently.
+  - [x] Diff command outputs changed POUs reliably on sample fixture + repo tests.
 
 ### P1 - Complete roadmap integration
 

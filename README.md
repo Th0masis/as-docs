@@ -91,9 +91,9 @@ as-docs upgrade --to N [--pou NAME]       # upgrade to higher level
 as-docs status                            # freshness report
 as-docs cache clear [--pou NAME]          # clear AI cache
 as-docs serve [--http --port 8765]        # MCP server
-as-docs watch [--level N]                 # daemon mode (planned)
-as-docs install-hook                      # git post-commit hook (planned)
-as-docs diff HEAD~1                       # changed POUs since commit (planned)
+as-docs watch [--level N] [--debounce-ms N] # daemon mode
+as-docs install-hook [--yes] [--force]     # git post-commit hook
+as-docs diff HEAD~1                       # changed POUs since commit
 ```
 
 Scoped behavior notes:
@@ -206,7 +206,7 @@ Anthropic provider reads the key from `ai.api_key_env` (for example `ANTHROPIC_A
 - Implemented level-aware MCP responses with `status: partial`, `available_level`, `requested_level`, and upgrade hints when a higher level is required
 - Implemented MCP payload + behavior tests for Phase 3 (`tests/test_phase3_mcp_server.py`)
 - Implemented scoped regeneration for `regenerate(scope)` and scoped CLI upgrades via `upgrade --pou`
-- Current limitation: `watch`, `install-hook`, and `diff` commands are exposed but currently not implemented
+- Implemented `as-docs diff`, `as-docs install-hook`, and `as-docs watch` for Phase 4 git integration
 - Current limitation: Level 4 flow-diagram pipeline is planned but not yet wired in generation
 
 See `EXECUTION_CHECKLIST.md` for the live prioritized execution tracker.
