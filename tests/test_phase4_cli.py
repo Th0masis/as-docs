@@ -4,7 +4,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from as_docs.cli import cli
+from as_docs.cli import cli, _watch_batch_scope, _watch_scope_for_path
 
 FIXTURE = Path(__file__).parent / "fixtures" / "SampleProject"
 
@@ -61,6 +61,54 @@ def test_diff_reports_changed_pous(monkeypatch, tmp_path: Path) -> None:
     assert "MotorControl" in result.output
 
 
+def test_diff_single_pou_change_remains_scoped(monkeypatch, tmp_path: Path) -> None:
+    cfg = tmp_path / ".as-docs.yaml"
+    cfg.write_text(_cfg_text(FIXTURE), encoding="utf-8")
+
+    diff_output = "Logical/MainProgram/Main.st"
+    monkeypatch.setattr("as_docs.cli.Repo", lambda *args, **kwargs: _FakeRepo(FIXTURE, diff_output))
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["diff", "HEAD~1", "--config", str(cfg)])
+
+    assert result.exit_code == 0
+    assert "Changed POUs (1)" in result.output
+    assert "MainProgram" in result.output
+    assert "MotorControl" not in result.output
+
+
+def test_diff_physical_change_maps_to_full_rebuild(monkeypatch, tmp_path: Path) -> None:
+    cfg = tmp_path / ".as-docs.yaml"
+    cfg.write_text(_cfg_text(FIXTURE), encoding="utf-8")
+
+    diff_output = "Physical/Config1/X20CP3173/Cpu.per"
+    monkeypatch.setattr("as_docs.cli.Repo", lambda *args, **kwargs: _FakeRepo(FIXTURE, diff_output))
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["diff", "HEAD~1", "--config", str(cfg)])
+
+    assert result.exit_code == 0
+    assert "Changed POUs (2)" in result.output
+    assert "MainProgram" in result.output
+    assert "MotorControl" in result.output
+
+
+def test_diff_global_var_change_maps_to_full_rebuild(monkeypatch, tmp_path: Path) -> None:
+    cfg = tmp_path / ".as-docs.yaml"
+    cfg.write_text(_cfg_text(FIXTURE), encoding="utf-8")
+
+    diff_output = "Logical/GlobalVars/GVL_Main.var"
+    monkeypatch.setattr("as_docs.cli.Repo", lambda *args, **kwargs: _FakeRepo(FIXTURE, diff_output))
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["diff", "HEAD~1", "--config", str(cfg)])
+
+    assert result.exit_code == 0
+    assert "Changed POUs (2)" in result.output
+    assert "MainProgram" in result.output
+    assert "MotorControl" in result.output
+
+
 def test_install_hook_is_idempotent(monkeypatch, tmp_path: Path) -> None:
     cfg = tmp_path / ".as-docs.yaml"
     cfg.write_text(_cfg_text(FIXTURE), encoding="utf-8")
@@ -84,3 +132,15 @@ def test_install_hook_is_idempotent(monkeypatch, tmp_path: Path) -> None:
     content = hook_file.read_text(encoding="utf-8")
     assert "# >>> as-docs hook start >>>" in content
     assert "# <<< as-docs hook end <<<" in content
+
+
+def test_watch_scope_helpers_classify_and_coalesce() -> None:
+    known_pous = {"MainProgram", "MotorControl"}
+
+    assert _watch_scope_for_path(FIXTURE / "Logical" / "MainProgram" / "Main.st", known_pous) == "pou:MainProgram"
+    assert _watch_scope_for_path(FIXTURE / "Logical" / "GlobalVars" / "GVL_Main.var", known_pous) == "changed"
+    assert _watch_scope_for_path(FIXTURE / "Physical" / "Config1" / "X20CP3173" / "Cpu.per", known_pous) == "changed"
+
+    assert _watch_batch_scope({"MainProgram"}, False) == "pou:MainProgram"
+    assert _watch_batch_scope({"MainProgram", "MotorControl"}, False) == "changed"
+    assert _watch_batch_scope(set(), True) == "changed"

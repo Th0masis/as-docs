@@ -163,6 +163,7 @@ Once you authenticate in the browser the token is cached at
 - `as-docs watch`, `as-docs install-hook`, and `as-docs diff` are currently planned and may print "not yet implemented" in this version.
 - Scoped upgrade is available: `as-docs upgrade --to 3 --pou MainProgram`.
 - `as-docs watch`, `as-docs install-hook`, and `as-docs diff` are now implemented for Phase 4 workflows.
+- `as-docs watch` batches rapid save events and regenerates once after files settle.
 
 ## Recommended daily workflow
 

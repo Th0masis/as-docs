@@ -207,6 +207,7 @@ Anthropic provider reads the key from `ai.api_key_env` (for example `ANTHROPIC_A
 - Implemented MCP payload + behavior tests for Phase 3 (`tests/test_phase3_mcp_server.py`)
 - Implemented scoped regeneration for `regenerate(scope)` and scoped CLI upgrades via `upgrade --pou`
 - Implemented `as-docs diff`, `as-docs install-hook`, and `as-docs watch` for Phase 4 git integration
+- `as-docs watch` now batches file events and regenerates once after the debounce window settles
 - Current limitation: Level 4 flow-diagram pipeline is planned but not yet wired in generation
 
 See `EXECUTION_CHECKLIST.md` for the live prioritized execution tracker.

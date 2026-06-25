@@ -309,14 +309,22 @@ def watch(level: int, debounce_ms: int, config_path: str | None) -> None:
         sys.exit(1)
 
     ai_enabled = bool(cfg.ai.enabled and level >= 2)
+    known_pous = _known_pou_names(cfg, project_root)
+    pending_pous: set[str] = set()
+    pending_generic_change = False
+    last_event_at = 0.0
+    debounce_seconds = max(0.0, debounce_ms / 1000.0)
 
     def _on_change(changed_path: Path) -> None:
-        pou = _resolve_pou_name_from_path(changed_path)
-        scope = f"pou:{pou}" if pou else "changed"
-        graph = run_generate(cfg, level=level, ai_enabled=ai_enabled, scope=scope)
-        meta = getattr(graph, "_regen_meta", {})
-        touched = ", ".join(meta.get("touched_pous", [])) or "—"
-        click.echo(f"↻  Regenerated (scope={meta.get('scope', scope)}) touched={touched}")
+        nonlocal last_event_at, pending_generic_change
+        scope = _watch_scope_for_path(changed_path, known_pous)
+        if scope is None:
+            return
+        if scope == "changed":
+            pending_generic_change = True
+        else:
+            pending_pous.add(scope.split(":", 1)[1])
+        last_event_at = time.monotonic()
 
     handler = _ASDocsWatchHandler(callback=_on_change, debounce_ms=debounce_ms)
     observer = Observer()
@@ -332,6 +340,18 @@ def watch(level: int, debounce_ms: int, config_path: str | None) -> None:
     observer.start()
     try:
         while True:
+            if (pending_pous or pending_generic_change) and (time.monotonic() - last_event_at) >= debounce_seconds:
+                scope = _watch_batch_scope(pending_pous, pending_generic_change)
+                pending_pous.clear()
+                pending_generic_change = False
+
+                if scope:
+                    graph = run_generate(cfg, level=level, ai_enabled=ai_enabled, scope=scope)
+                    meta = getattr(graph, "_regen_meta", {})
+                    touched = ", ".join(meta.get("touched_pous", [])) or "—"
+                    click.echo(
+                        f"↻  Regenerated {meta.get('scope', scope)}; touched POUs: {touched}; elapsed: {meta.get('elapsed_seconds', 0.0)}s"
+                    )
             time.sleep(0.25)
     except KeyboardInterrupt:
         click.echo("\nStopping watcher...")
@@ -483,6 +503,45 @@ def _resolve_pou_name_from_path(path: Path) -> str | None:
     if path.parent.name == "GlobalVars":
         return None
     return path.parent.name
+
+
+def _watch_scope_for_path(path: Path, known_pous: set[str]) -> str | None:
+    if "Physical" in path.parts:
+        return "changed"
+
+    lower_suffix = path.suffix.lower()
+    if lower_suffix not in {".st", ".prg", ".var", ".typ", ".per"}:
+        return None
+
+    if "Logical" not in path.parts:
+        return None
+
+    logical_idx = path.parts.index("Logical")
+    if len(path.parts) <= logical_idx + 1:
+        return None
+
+    section = path.parts[logical_idx + 1]
+    if section == "GlobalVars" or lower_suffix == ".typ":
+        return "changed"
+
+    pou = _resolve_pou_name_from_path(path)
+    if pou and pou in known_pous:
+        return f"pou:{pou}"
+
+    if lower_suffix == ".per":
+        return "changed"
+
+    return None
+
+
+def _watch_batch_scope(pous: set[str], generic_change: bool) -> str | None:
+    if generic_change:
+        return "changed"
+    if not pous:
+        return None
+    if len(pous) == 1:
+        return f"pou:{next(iter(pous))}"
+    return "changed"
 
 
 def _is_relevant_source_path(path: Path) -> bool:
