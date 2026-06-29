@@ -146,6 +146,53 @@ scanner:
 
 `Temp/`, `Binaries/`, and `Diagnosis/` directories are always excluded from scanning.
 
+### Nested Package Scanning (AS6+)
+
+As of Phase 1.2, as-docs supports **recursive hierarchical package structures** found in modern Automation Studio 6 projects. Legacy AS4 flat structures continue to work unchanged.
+
+**AS4 structure (flat):**
+```
+Logical/
+├── Package.pkg           (root package, quasi-XML format)
+├── Program1/IEC.prg
+├── Program2/IEC.prg
+└── FB_Helper/IEC.fub
+```
+
+**AS6 structure (nested):**
+```
+Logical/
+├── Package.pkg           (root package, AS6 XML with xmlns namespace)
+├── TopProgram/IEC.prg
+└── Infrastructure/
+    ├── Package.pkg       (nested package descriptor)
+    ├── AlarmProg/IEC.prg
+    └── Alarms/
+        ├── Package.pkg   (doubly-nested package)
+        ├── AlarmProg/IEC.prg
+        └── BoolSubscription/IEC.prg
+```
+
+**Format detection:**
+- AS6: `Package.pkg` contains `xmlns="http://br-automation.co.at/AS/Package"` and `<Objects>` XML elements
+- AS4: `.pkg` files use quasi-XML with `Name=` and `ObjectType=` attributes (backward compatible)
+
+**Package hierarchy tracking:**
+Each discovered POU gets a `package_path` field (dot-separated hierarchy):
+- Top-level: `TopProgram` (no prefix)
+- Nested: `Infrastructure.Alarms.AlarmProg`
+- Deep: `Infrastructure.Alarms.Chart.ChartFB`
+
+**Configuration:**
+```yaml
+scanner:
+  recursive_packages: true          # enable/disable nested package scanning
+  max_recursion_depth: 10           # prevent infinite loops in circular refs
+```
+
+**Cycle detection:**
+The scanner maintains a `visited` set of canonical `Package.pkg` paths (resolved symlinks) to detect and skip circular package references, logging warnings when encountered.
+
 ---
 
 ## 4. Core Data Model
@@ -197,6 +244,7 @@ class POUNode:
     local_vars: list[Variable] = field(default_factory=list)
     instances: list[str] = field(default_factory=list)  # instance names in parents
     is_external_library: bool = False      # True for FBs from precompiled libs (Mp*, Mc*, ACP10*)
+    package_path: str = ""                 # dot-separated hierarchy (e.g., "Infrastructure.Alarms")
 
 @dataclass
 class TaskConfig:

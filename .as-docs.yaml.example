@@ -17,6 +17,8 @@ scanner:
     - "Mc"
     - "ACP10"
     - "Ar"
+  recursive_packages: true          # recursively scan nested Package.pkg hierarchies (AS6+)
+  max_recursion_depth: 10           # prevent runaway recursion in circular/deep package trees
 
 ai:
   enabled: true

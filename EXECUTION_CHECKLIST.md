@@ -69,6 +69,34 @@ Evidence used for verification:
   - [x] Hook file is created/updated safely and idempotently.
   - [x] Diff command outputs changed POUs reliably on sample fixture + repo tests.
 
+#### 2.5) Nested package support (Phase 1.2)
+- Priority: P0
+- Estimate: 0.5 day
+- Status: [x] **COMPLETE** — commit cd444e29
+- Why:
+  - SOMA project had 41+ nested POUs but scanner only found 2 (flat package assumption)
+  - AS6 hierarchies (Infrastructure/ → Alarms/ → ChartFB/) are common in modern projects
+- Tasks:
+  - [x] Add `recursive_packages: bool` and `max_recursion_depth: int` config fields
+  - [x] Rewrite `pkg_parser.py` with dual AS4/AS6 format support
+    - AS6 detection: `xmlns="http://br-automation.co.at/AS/Package"` marker
+    - `parse_as6_package_objects()`: XML `<Objects>` element parsing
+    - `parse_pkg()`: Auto-detect format, return `POUNode` with parent-dir name for AS6 IEC.prg
+  - [x] Add recursive `_scan_package_tree()` in `project_scanner.py`
+    - Visited set (canonical paths) for cycle detection
+    - Depth limit enforcement via `max_recursion_depth`
+    - `package_path` field population (e.g., "Infrastructure.Alarms.AlarmProg")
+  - [x] Add `package_path: str` field to `POUNode` model
+  - [x] Test coverage: 19 new tests in `test_nested_packages.py` + fixture
+- Done criteria:
+  - [x] SOMA project: 2 POUs → 33 POUs (all nested Infrastructure + 7 sub-packages discovered)
+  - [x] AS4 backward compatibility: 26 Phase 1 tests still pass
+  - [x] Circular refs: cycle detection + warning log, no hangs
+  - [x] Max depth: respects config limit, does not recurse infinitely
+  - [x] 27 new tests passing, 73 suite tests passing (1 pre-existing auth env failure unrelated)
+- Real-world validation:
+  - SOMA Infrastructure folder (3-level nesting): AlarmProg, BoolSubscription, StringSubscription, DryChart, EnergyAir, EnergyWater, MeterAlarm, MeterData all correctly discovered with package paths
+
 ### P1 - Complete roadmap integration
 
 #### 3) Phase 5 template deliverables

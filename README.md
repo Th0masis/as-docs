@@ -17,6 +17,7 @@ Parses AS project files, extracts structural and semantic information, optionall
 - **Level 2** — Task enrichment pipeline: AI-generated task summaries stored in the knowledge graph and reused via cache
 - **Level 3** — POU enrichment pipeline: AI-generated POU descriptions, responsibilities, patterns, and notes stored in the knowledge graph
 - **Level 4** — Flow diagrams: parser-first behavioral Mermaid diagrams with AI enrichment fallback
+- **Nested packages** — Recursive AS6 Package.pkg traversal discovers POUs in hierarchical structures (Infrastructure, Charts, Wizard, etc.); identifies package_path for every POU
 - **AI cache** — Provider/model-separated cache for Level 2 and Level 3 enrichment
 - **MCP server** — FastMCP server for AI agent integration (Claude Code, VS Code Copilot)
 - **Standalone binary** — optional PyInstaller build for a zero-Python `as-docs-server.exe`
@@ -59,13 +60,18 @@ as-docs init                    # detect project root, create .as-docs.yaml
 # $env:GITHUB_TOKEN = "<token>"
 
 # Generate Level 1 docs (no AI, instant)
+# Automatically detects and recursively scans nested packages (AS6)
 as-docs generate --no-ai
 
 # Generate docs with AI enrichment (Level 3 default)
 as-docs generate
 
-# Check freshness
+# Check freshness (shows all discovered POUs, including nested)
 as-docs status
+
+# For projects with deep or circular package hierarchies, adjust:
+# recursive_packages: false       (disable recursive scanning)
+# max_recursion_depth: 5          (reduce depth limit)
 ```
 
 ## Documentation Levels
