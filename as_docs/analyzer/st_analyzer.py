@@ -74,6 +74,7 @@ class STAnalysisResult:
     writes: list[str] = field(default_factory=list)         # variable names written
     reads: list[str] = field(default_factory=list)          # variable names read
     instances: list[str] = field(default_factory=list)      # FB instance names
+    instance_types: dict[str, str] = field(default_factory=dict)  # instance name -> FB type
     # Flow hints for Level 4
     has_case: bool = False
     has_if: bool = False
@@ -102,6 +103,7 @@ def analyze_st(
     # Find FB instances from VAR blocks in the source itself
     fb_instances = _extract_fb_instances(source)
     result.instances = list(fb_instances.keys())
+    result.instance_types = dict(fb_instances)
 
     # Build set of instance names to avoid emitting them as calls/reads/writes
     instance_names = set(fb_instances.keys())

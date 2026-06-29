@@ -32,18 +32,16 @@ def build_edges(model: ProjectModel, analysis_results: list[STAnalysisResult]) -
         for var in result.writes:
             edges.append(Edge(source=pou_name, target=var, edge_type="WRITES"))
 
-    # INSTANCE_OF edges: POUNode instances list
-    for pou in model.pous.values():
-        for inst_name in pou.instances:
-            # Find what type this instance is — look up in POUs
-            for other_pou in model.pous.values():
-                if other_pou.name != pou.name:
-                    edges.append(Edge(
-                        source=pou.name,
-                        target=other_pou.name,
-                        edge_type="INSTANCE_OF",
-                    ))
-                    break
+    # INSTANCE_OF edges from analyzed instance type mappings
+    for result in analysis_results:
+        source_pou = result.pou_name
+        for fb_type in result.instance_types.values():
+            if fb_type in model.pous and fb_type != source_pou:
+                edges.append(Edge(
+                    source=source_pou,
+                    target=fb_type,
+                    edge_type="INSTANCE_OF",
+                ))
 
     return edges
 

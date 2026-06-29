@@ -68,6 +68,37 @@ def test_per_parser():
     assert cyclic.cycle_time_ms == 10
 
 
+def test_per_parser_sw_taskclass_format(tmp_path):
+        from as_docs.scanner.per_parser import parse_per_file
+
+        sw_file = tmp_path / "Cpu.sw"
+        sw_file.write_text(
+                """<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<SwConfiguration xmlns=\"http://br-automation.co.at/AS/SwConfiguration\">
+    <TaskClass Name=\"Cyclic#1\">
+        <Task Name=\"SubsAlarms\" Source=\"Infrastructure.SubsAlarms.prg\" />
+        <Task Name=\"AlarmProg\" Source=\"Infrastructure.Alarms.AlarmProg.prg\" />
+    </TaskClass>
+    <TaskClass Name=\"Init\">
+        <Task Name=\"InitProg\" Source=\"Infrastructure.System.InitProg.prg\" />
+    </TaskClass>
+</SwConfiguration>
+""",
+                encoding="utf-8",
+        )
+
+        tasks = parse_per_file(sw_file, configuration="OptimaMaster")
+        by_name = {t.name: t for t in tasks}
+
+        assert "Cyclic#1" in by_name
+        assert by_name["Cyclic#1"].task_type == "cyclic"
+        assert by_name["Cyclic#1"].programs == ["SubsAlarms", "AlarmProg"]
+
+        assert "Init" in by_name
+        assert by_name["Init"].task_type == "init"
+        assert by_name["Init"].programs == ["InitProg"]
+
+
 def test_full_scan():
     from as_docs.config import Config, ScannerConfig
     from as_docs.scanner.project_scanner import scan_project
@@ -124,3 +155,102 @@ def test_level1_generate(tmp_path):
     assert (tmp_path / "docs" / "global_vars.md").exists()
     assert (tmp_path / "docs" / "data_types.md").exists()
     assert (tmp_path / "docs" / "llms.txt").exists()
+
+
+def test_generate_honors_output_formats_json_only(tmp_path):
+    from as_docs.config import Config, ScannerConfig, OutputConfig
+    from as_docs.engine import run_generate
+
+    cfg = Config()
+    cfg.scanner = ScannerConfig(active_configuration="Config1")
+    cfg.project.name = "SampleProject"
+    cfg.output = OutputConfig(docs_dir=str(tmp_path / "docs"), formats=["json"])
+
+    run_generate(cfg, level=2, ai_enabled=False, project_root=FIXTURE)
+
+    assert (tmp_path / "docs" / "knowledge_graph.json").exists()
+    assert not (tmp_path / "docs" / "overview.md").exists()
+    assert not (tmp_path / "docs" / "architecture.md").exists()
+    assert not (tmp_path / "docs" / "data_flow.md").exists()
+    assert not (tmp_path / "docs" / "llms.txt").exists()
+
+
+def test_generate_honors_output_formats_markdown_only(tmp_path):
+    from as_docs.config import Config, ScannerConfig, OutputConfig
+    from as_docs.engine import run_generate
+
+    cfg = Config()
+    cfg.scanner = ScannerConfig(active_configuration="Config1")
+    cfg.project.name = "SampleProject"
+    cfg.output = OutputConfig(docs_dir=str(tmp_path / "docs"), formats=["markdown"])
+
+    run_generate(cfg, level=2, ai_enabled=False, project_root=FIXTURE)
+
+    assert not (tmp_path / "docs" / "knowledge_graph.json").exists()
+    assert (tmp_path / "docs" / "overview.md").exists()
+    assert (tmp_path / "docs" / "architecture.md").exists()
+    assert (tmp_path / "docs" / "data_flow.md").exists()
+    assert not (tmp_path / "docs" / "llms.txt").exists()
+
+
+def test_instance_of_edges_use_real_fb_type_mapping(tmp_path):
+    from as_docs.analyzer.call_graph import build_edges
+    from as_docs.analyzer.st_analyzer import STAnalysisResult
+    from as_docs.model.graph import POUNode
+    from as_docs.model.project import ProjectModel
+
+    model = ProjectModel(
+        project_root=FIXTURE,
+        project_name="SampleProject",
+        as_version="4.10",
+        active_configuration="Config1",
+    )
+    model.pous["MainProgram"] = POUNode(
+        name="MainProgram",
+        pou_type="PROGRAM",
+        source_file="Logical/MainProgram/MainProgram.prg",
+    )
+    model.pous["MotorControl"] = POUNode(
+        name="MotorControl",
+        pou_type="FUNCTION_BLOCK",
+        source_file="Logical/MotorControl/MotorControl.prg",
+    )
+    model.pous["OtherFb"] = POUNode(
+        name="OtherFb",
+        pou_type="FUNCTION_BLOCK",
+        source_file="Logical/OtherFb/OtherFb.prg",
+    )
+
+    analysis = STAnalysisResult(
+        pou_name="MainProgram",
+        instance_types={"motorInst": "MotorControl"},
+    )
+
+    edges = build_edges(model, [analysis])
+    instance_edges = [e for e in edges if e.edge_type == "INSTANCE_OF" and e.source == "MainProgram"]
+    targets = {e.target for e in instance_edges}
+
+    assert targets == {"MotorControl"}
+
+
+def test_architecture_diagram_has_fallback_note_when_empty():
+    from as_docs.generator.diagram_gen import generate_architecture_diagram
+    from as_docs.model.graph import KnowledgeGraph
+
+    graph = KnowledgeGraph(
+        schema_version="1.0",
+        project_name="EmptyProject",
+        as_version="",
+        generated_at="2026-01-01T00:00:00+00:00",
+        level=1,
+        active_configuration="",
+        pous={},
+        tasks={},
+        global_vars={},
+        data_types={},
+        edges=[],
+        flow_diagrams={},
+    )
+
+    diagram = generate_architecture_diagram(graph)
+    assert "No task-program-call relationships detected" in diagram

@@ -40,6 +40,10 @@ def parse_per_file(path: Path, configuration: str = "") -> list[TaskConfig]:
 
 def _parse_xml(text: str, configuration: str) -> list[TaskConfig]:
     root = ET.fromstring(text)
+    root_local = _local_name(root.tag)
+    if root_local == "SwConfiguration":
+        return _parse_sw_configuration(root, configuration)
+
     tasks: list[TaskConfig] = []
 
     # Strip namespace prefix for compatibility
@@ -80,6 +84,54 @@ def _parse_xml(text: str, configuration: str) -> list[TaskConfig]:
     return tasks
 
 
+def _parse_sw_configuration(root: ET.Element, configuration: str) -> list[TaskConfig]:
+    """Parse AS6 Cpu.sw task layout.
+
+    Shape:
+      <SwConfiguration>
+        <TaskClass Name="Cyclic#1">
+          <Task Name="ProgAlias" Source="Infrastructure.Alarms.AlarmProg.prg" />
+        </TaskClass>
+      </SwConfiguration>
+    """
+    tasks: list[TaskConfig] = []
+    ns = _detect_namespace(root.tag)
+
+    for class_el in root.iter(_tag(ns, "TaskClass")):
+        class_name = class_el.get("Name", "").strip()
+        if not class_name:
+            continue
+
+        class_name_lower = class_name.lower()
+        if class_name_lower.startswith("init"):
+            task_type = "init"
+        elif class_name_lower.startswith("exit"):
+            task_type = "exit"
+        else:
+            task_type = "cyclic"
+
+        cycle_time_ms = _parse_cycle_time(class_el.get("CycleTime", class_el.get("Cycle", "")))
+        programs: list[str] = []
+
+        for task_el in class_el.iter(_tag(ns, "Task")):
+            source = task_el.get("Source", "")
+            prog_name = _program_name_from_source(source)
+            if prog_name and prog_name not in programs:
+                programs.append(prog_name)
+
+        tasks.append(
+            TaskConfig(
+                name=class_name,
+                task_type=task_type,  # type: ignore[arg-type]
+                cycle_time_ms=cycle_time_ms,
+                programs=programs,
+                configuration=configuration,
+            )
+        )
+
+    return tasks
+
+
 def _parse_regex_fallback(text: str, configuration: str) -> list[TaskConfig]:
     tasks = []
     for m in _TASK_RE.finditer(text):
@@ -97,6 +149,12 @@ def _detect_namespace(tag: str) -> str:
     if tag.startswith("{"):
         return tag[1:tag.index("}")]
     return ""
+
+
+def _local_name(tag: str) -> str:
+    if tag.startswith("{"):
+        return tag[tag.index("}") + 1 :]
+    return tag
 
 
 def _tag(ns: str, local: str) -> str:
@@ -136,6 +194,15 @@ def _program_name_from_source(source: str) -> str | None:
     source = source.strip()
     if not source:
         return None
+
+    # Dotted AS6 path style: Infrastructure.Alarms.AlarmProg.prg -> AlarmProg
+    if "/" not in source and "\\" not in source and "." in source:
+        parts = source.split(".")
+        if len(parts) >= 2:
+            ext = parts[-1].lower()
+            if ext in {"prg", "fub", "fun", "st"}:
+                return parts[-2]
+
     # AS6 style ":SEG:Package:Program"
     if source.startswith(":"):
         parts = [p for p in source.split(":") if p]

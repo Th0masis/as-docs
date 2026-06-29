@@ -66,11 +66,18 @@ def run_generate(
     if level >= 4:
         _populate_flow_diagrams(graph, model, ai_enabled=ai_enabled, scope=scope, target_pous=target_pous)
 
-    # 6. Generate outputs
+    # 6. Generate outputs (honor configured output.formats)
     output_dir = Path(config.output.docs_dir)
-    generate_json(graph, output_dir)
-    generate_all_markdown(graph, output_dir)
-    generate_llms_txt(graph, output_dir)
+    configured_formats = {f.strip().lower() for f in config.output.formats if str(f).strip()}
+    if not configured_formats:
+        configured_formats = {"markdown", "json", "llms.txt"}
+
+    if "json" in configured_formats:
+        generate_json(graph, output_dir)
+    if "markdown" in configured_formats:
+        generate_all_markdown(graph, output_dir)
+    if "llms.txt" in configured_formats or "llms" in configured_formats:
+        generate_llms_txt(graph, output_dir)
 
     setattr(
         graph,

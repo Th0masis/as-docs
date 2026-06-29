@@ -320,9 +320,10 @@ def _scan_physical(physical: Path, model: ProjectModel, config: Config) -> None:
 
     model.active_configuration = chosen.name
 
-    # Find Cpu.per files inside chosen config
-    for per_file in chosen.rglob("Cpu.per"):
-        tasks = parse_per_file(per_file, configuration=chosen.name)
+    # Find task config files inside chosen config (AS4: Cpu.per, AS6: Cpu.sw)
+    task_files = list(chosen.rglob("Cpu.per")) + list(chosen.rglob("Cpu.sw"))
+    for task_file in task_files:
+        tasks = parse_per_file(task_file, configuration=chosen.name)
         for task in tasks:
             model.tasks[task.name] = task
 
@@ -338,36 +339,3 @@ def _is_under(path: Path, parent: Path) -> bool:
 def _apply_external_flag(pou: POUNode, ext_prefixes: list[str]) -> None:
     if any(pou.name.startswith(p) for p in ext_prefixes):
         pou.is_external_library = True
-
-
-
-def scan_project(config: Config, project_root: Path | None = None) -> ProjectModel:
-    """Scan an AS project and return a populated ProjectModel.
-
-    Args:
-        config: Loaded .as-docs.yaml config.
-        project_root: Explicit project root. If None, detected from config.
-    """
-    if project_root is None:
-        project_root = _resolve_root(config)
-
-    model = ProjectModel(
-        project_root=project_root,
-        project_name=config.project.name or project_root.name,
-        as_version=config.project.as_version,
-        active_configuration=config.scanner.active_configuration or "",
-    )
-
-    ignore = set(config.scanner.ignore_dirs)
-    logical = project_root / "Logical"
-    physical = project_root / "Physical"
-
-    # -- Scan Logical/ for POUs, vars, types, ST sources -------------------
-    if logical.is_dir():
-        _scan_logical(logical, model, config, ignore)
-
-    # -- Scan Physical/ for task config ------------------------------------
-    if physical.is_dir():
-        _scan_physical(physical, model, config)
-
-    return model

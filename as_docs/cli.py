@@ -129,15 +129,17 @@ scanner:
   ignore_dirs: [Temp, Binaries, Diagnosis]
   scan_libraries: true
   external_lib_prefixes: [Mp, Mc, ACP10, Ar]
+  recursive_packages: true
+  max_recursion_depth: 10
 
 ai:
   enabled: true
-    provider: "copilot"
-    model: "gpt-4.1"
-    api_base_url: ""
-    api_key_env: "GITHUB_TOKEN"
-    timeout_seconds: 60
-    max_retries: 3
+  provider: "copilot"
+  model: "gpt-4.1"
+  api_base_url: ""
+  api_key_env: "GITHUB_TOKEN"
+  timeout_seconds: 60
+  max_retries: 3
   cache_dir: ".as-docs-cache"
 
 server:
