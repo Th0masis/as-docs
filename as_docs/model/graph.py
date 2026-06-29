@@ -45,6 +45,7 @@ class POUNode:
     local_vars: list[Variable] = field(default_factory=list)
     instances: list[str] = field(default_factory=list)   # instance names in parents
     is_external_library: bool = False
+    package_path: str = ""                      # dot-separated package hierarchy, e.g. "Infrastructure.Alarms"
 
 
 @dataclass

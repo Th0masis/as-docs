@@ -469,6 +469,17 @@ class CopilotProvider:
                 parsed = json.loads(raw_json)
                 return _normalize_payload(parsed)
             except (RuntimeError, TimeoutError, Exception) as exc:
+                if _is_sdk_not_installed_error(exc):
+                    # The github-copilot-sdk package is absent; fall back to HTTP if possible.
+                    if _has_resolvable_github_token(self._cfg.api_key_env):
+                        _LOG.info("Copilot SDK not installed; attempting direct HTTP API fallback.")
+                        return self._request_via_http(prompt=prompt, model=model, max_tokens=max_tokens)
+                    raise RuntimeError(
+                        "The 'github-copilot-sdk' package is not installed and no GitHub token "
+                        "is available for the HTTP fallback. "
+                        f"Set the {self._cfg.api_key_env} environment variable (or GH_TOKEN / "
+                        "GH_COPILOT_TOKEN) to a valid token and retry."
+                    ) from exc
                 if _is_sdk_auth_error(exc):
                     # SDK auth failure: only try HTTP fallback when a token is actually available.
                     # Otherwise preserve the original SDK error to avoid masking the root cause.
@@ -543,13 +554,47 @@ class CopilotProvider:
                 _sdk_auth_error_message(self._cfg.api_key_env)
                 + "\n\nDirect HTTP fallback also failed: no GitHub token available."
             )
-        content = _send_via_copilot_http(
-            github_token=token,
-            prompt=prompt,
-            model=model,
-            max_tokens=max_tokens,
-            timeout=self._cfg.timeout_seconds,
-        )
+        try:
+            content = _send_via_copilot_http(
+                github_token=token,
+                prompt=prompt,
+                model=model,
+                max_tokens=max_tokens,
+                timeout=self._cfg.timeout_seconds,
+            )
+        except RuntimeError as exc:
+            if _is_copilot_scope_error(exc):
+                # The resolved token exists but lacks the Copilot scope (HTTP 404).
+                # Try OAuth Device Flow if a client_id is available.
+                client_id = self._cfg.oauth_client_id or os.getenv("AS_DOCS_OAUTH_CLIENT_ID", "").strip()
+                if client_id:
+                    _LOG.info(
+                        "Token lacks Copilot scope; starting OAuth Device Flow for a scoped token."
+                    )
+                    device_token = _resolve_github_token_via_device_flow(client_id)
+                    if device_token:
+                        content = _send_via_copilot_http(
+                            github_token=device_token,
+                            prompt=prompt,
+                            model=model,
+                            max_tokens=max_tokens,
+                            timeout=self._cfg.timeout_seconds,
+                        )
+                    else:
+                        raise RuntimeError(
+                            "OAuth Device Flow did not complete. Authorize the app and retry."
+                        ) from exc
+                else:
+                    raise RuntimeError(
+                        f"{exc}\n\n"
+                        "The resolved token does not have Copilot API access. Options:\n"
+                        "  1. Set GH_TOKEN to a GitHub PAT with Copilot access.\n"
+                        "  2. Run 'gh auth login' so 'gh auth token' returns a scoped token.\n"
+                        "  3. Add 'oauth_client_id: <your-app-id>' to .as-docs.yaml to enable "
+                        "interactive OAuth Device Flow."
+                    ) from exc
+            else:
+                raise
         raw_json = _extract_json_block(content)
         parsed = json.loads(raw_json)
         return _normalize_payload(parsed)
@@ -649,6 +694,17 @@ def _extract_json_block(text: str) -> str:
     if start < 0 or end < 0 or end <= start:
         raise RuntimeError("Copilot provider response does not contain a JSON object.")
     return text[start : end + 1]
+
+
+def _is_sdk_not_installed_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "copilot sdk is not installed" in msg
+
+
+def _is_copilot_scope_error(exc: Exception) -> bool:
+    """True when the resolved token was found but doesn't have Copilot API access (HTTP 404)."""
+    msg = str(exc).lower()
+    return "http 404" in msg and "copilot" in msg
 
 
 def _is_sdk_auth_error(exc: Exception) -> bool:

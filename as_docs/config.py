@@ -23,6 +23,8 @@ class ScannerConfig:
     external_lib_prefixes: list[str] = field(
         default_factory=lambda: ["Mp", "Mc", "ACP10", "Ar"]
     )
+    recursive_packages: bool = True            # recursively scan nested Package.pkg hierarchies
+    max_recursion_depth: int = 10              # prevent runaway recursion
 
 
 @dataclass
