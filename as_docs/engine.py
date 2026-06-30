@@ -79,7 +79,7 @@ def run_generate(
     # 4. AI enrichment (Level 2+)
     if ai_enabled and level >= 2:
         from as_docs.enricher.ai_enricher import enrich_graph
-        ai_stats = enrich_graph(graph, level=level, config=config)
+        ai_stats = enrich_graph(graph, level=level, config=config, project_root=project_root)
         setattr(graph, "_ai_stats", ai_stats)
 
     if level >= 4:
@@ -98,7 +98,12 @@ def run_generate(
     if "llms.txt" in configured_formats or "llms" in configured_formats:
         generate_llms_txt(graph, output_dir)
 
-    # 6. Save conflict report if as-cli was used
+    # 6. Write POU hash files for freshness tracking (if not already done)
+    if level < 3 or not ai_enabled:
+        from as_docs.enricher.ai_enricher import _write_pou_hashes
+        _write_pou_hashes(graph, config, project_root)
+
+    # 7. Save conflict report if as-cli was used
     if conflict_report is not None:
         _save_conflict_report(conflict_report, output_dir)
 

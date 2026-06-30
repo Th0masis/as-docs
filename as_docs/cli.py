@@ -399,7 +399,7 @@ def status(config_path: str | None) -> None:
     if staleness:
         click.echo("\nPOU freshness:")
         for pou_name, state in sorted(staleness.items()):
-            icon = "" if state == "fresh" else ("⚠" if state == "stale" else "?")
+            icon = "" if state == "fresh" else ("!" if state == "stale" else "?")
             click.echo(f"  {icon} {pou_name}: {state}")
 
 
