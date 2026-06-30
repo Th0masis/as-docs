@@ -21,8 +21,12 @@ def _config(tmp_path: Path) -> Config:
 
 
 def test_flow_extractor_builds_case_and_if_diagrams() -> None:
-    main_source = (FIXTURE / "Logical" / "MainProgram" / "Main.st").read_text(encoding="utf-8")
-    motor_source = (FIXTURE / "Logical" / "MotorControl" / "MotorControl.st").read_text(encoding="utf-8")
+    main_source = (FIXTURE / "Logical" / "MainProgram" / "Main.st").read_text(
+        encoding="utf-8"
+    )
+    motor_source = (FIXTURE / "Logical" / "MotorControl" / "MotorControl.st").read_text(
+        encoding="utf-8"
+    )
 
     main_diagram = build_flow_diagram("MainProgram", main_source)
     motor_diagram = build_flow_diagram("MotorControl", motor_source)
@@ -40,7 +44,9 @@ def test_flow_extractor_builds_case_and_if_diagrams() -> None:
 
 
 def test_flow_diagram_uses_ai_fallback_narrative() -> None:
-    main_source = (FIXTURE / "Logical" / "MainProgram" / "Main.st").read_text(encoding="utf-8")
+    main_source = (FIXTURE / "Logical" / "MainProgram" / "Main.st").read_text(
+        encoding="utf-8"
+    )
 
     diagram = build_flow_diagram(
         "MainProgram",

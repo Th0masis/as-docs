@@ -79,7 +79,9 @@ def test_engine_scope_pou_reports_touched(tmp_path: Path) -> None:
 
 
 def test_mcp_regenerate_payload_includes_scope_metadata(monkeypatch) -> None:
-    monkeypatch.setattr("as_docs.mcp_server.run_generate", lambda *args, **kwargs: _dummy_graph())
+    monkeypatch.setattr(
+        "as_docs.mcp_server.run_generate", lambda *args, **kwargs: _dummy_graph()
+    )
 
     cfg = Config()
     payload = regenerate_payload(cfg, scope="pou:MainProgram")
@@ -106,7 +108,9 @@ output:
         encoding="utf-8",
     )
 
-    monkeypatch.setattr("as_docs.engine.run_generate", lambda *args, **kwargs: _dummy_graph())
+    monkeypatch.setattr(
+        "as_docs.engine.run_generate", lambda *args, **kwargs: _dummy_graph()
+    )
 
     runner = CliRunner()
     result = runner.invoke(

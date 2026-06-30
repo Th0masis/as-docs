@@ -18,6 +18,7 @@ AS6 format:
     <Program SubType="IEC" xmlns="http://br-automation.co.at/AS/Program">
     POU name is derived from the parent directory.
 """
+
 from __future__ import annotations
 import logging
 import re
@@ -70,9 +71,13 @@ _AS6_OBJ_TYPE_MAP = {
 # Public API
 # ---------------------------------------------------------------------------
 
+
 class PkgObject(NamedTuple):
     """An entry parsed from an AS6 Package.pkg <Object> element."""
-    obj_type: str       # "Package", "Program", "Library", "File", "FunctionBlock", "Function"
+
+    obj_type: (
+        str  # "Package", "Program", "Library", "File", "FunctionBlock", "Function"
+    )
     name: str
     description: str
 
@@ -113,7 +118,9 @@ def parse_as6_package_objects(path: Path) -> list[PkgObject]:
         name = (obj.text or "").strip()
         description = obj.get("Description", "")
         if name:
-            result.append(PkgObject(obj_type=obj_type, name=name, description=description))
+            result.append(
+                PkgObject(obj_type=obj_type, name=name, description=description)
+            )
 
     return result
 

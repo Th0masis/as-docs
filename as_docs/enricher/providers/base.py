@@ -13,8 +13,10 @@ class EnrichmentPayload:
 
 
 class AIProvider(Protocol):
-    def enrich_task(self, prompt: str, model: str, max_tokens: int) -> EnrichmentPayload:
-        ...
+    def enrich_task(
+        self, prompt: str, model: str, max_tokens: int
+    ) -> EnrichmentPayload: ...
 
-    def enrich_pou(self, prompt: str, model: str, max_tokens: int) -> EnrichmentPayload:
-        ...
+    def enrich_pou(
+        self, prompt: str, model: str, max_tokens: int
+    ) -> EnrichmentPayload: ...

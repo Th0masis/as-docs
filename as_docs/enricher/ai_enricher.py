@@ -1,4 +1,5 @@
 """AI enricher for documentation Levels 2 and 3."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,11 +11,18 @@ from as_docs.enricher.providers import create_provider
 from as_docs.model.graph import KnowledgeGraph
 
 
-def enrich_graph(graph: KnowledgeGraph, level: int, config: Config) -> CacheStats:
+def enrich_graph(
+    graph: KnowledgeGraph, level: int, config: Config, project_root: Path | None = None
+) -> CacheStats:
     """Enrich KnowledgeGraph with AI-generated descriptions for Level 2/3.
 
     Returns cache stats for CLI observability.
     """
+    from as_docs.config import find_project_root
+
+    if project_root is None:
+        project_root = find_project_root() or Path(".")
+
     provider = create_provider(config)
     cache = EnrichmentCache(
         cache_dir=Path(config.ai.cache_dir),
@@ -24,10 +32,23 @@ def enrich_graph(graph: KnowledgeGraph, level: int, config: Config) -> CacheStat
     stats = CacheStats()
 
     if level >= 2:
-        _enrich_tasks(graph=graph, config=config, cache=cache, provider=provider, stats=stats)
+        _enrich_tasks(
+            graph=graph, config=config, cache=cache, provider=provider, stats=stats
+        )
 
     if level >= 3:
-        _enrich_pous(graph=graph, config=config, cache=cache, provider=provider, stats=stats)
+        _enrich_pous(
+            graph=graph,
+            config=config,
+            cache=cache,
+            provider=provider,
+            stats=stats,
+            project_root=project_root,
+        )
+
+    # Write hash files for freshness tracking (if we processed POUs)
+    if level >= 3:
+        _write_pou_hashes(graph=graph, config=config, project_root=project_root)
 
     return stats
 
@@ -68,10 +89,14 @@ def _enrich_tasks(
             writes=writes,
             coupling_tasks=coupling_tasks,
         )
-        payload = provider.enrich_task(prompt=prompt, model=config.ai.model, max_tokens=1024)
+        payload = provider.enrich_task(
+            prompt=prompt, model=config.ai.model, max_tokens=1024
+        )
         task.description = payload.description
         task.responsibilities = payload.responsibilities
-        cache.set(scope="task", name=task_name, level=2, content=key_material, payload=payload)
+        cache.set(
+            scope="task", name=task_name, level=2, content=key_material, payload=payload
+        )
         stats.misses += 1
         stats.writes += 1
 
@@ -82,6 +107,7 @@ def _enrich_pous(
     cache: EnrichmentCache,
     provider,
     stats: CacheStats,
+    project_root: Path | None = None,
 ) -> None:
     for pou_name, pou in sorted(graph.pous.items()):
         if pou.is_external_library:
@@ -109,7 +135,9 @@ def _enrich_pous(
             callers=callers,
             callees=callees,
         )
-        payload = provider.enrich_pou(prompt=prompt, model=config.ai.model, max_tokens=1024)
+        payload = provider.enrich_pou(
+            prompt=prompt, model=config.ai.model, max_tokens=1024
+        )
         pou.description = payload.description
         pou.responsibilities = payload.responsibilities
         pou.patterns = payload.patterns
@@ -136,7 +164,9 @@ def _resolve_st_source(pou) -> str:
     return ""
 
 
-def _pou_callers_callees(graph: KnowledgeGraph, pou_name: str) -> tuple[list[str], list[str]]:
+def _pou_callers_callees(
+    graph: KnowledgeGraph, pou_name: str
+) -> tuple[list[str], list[str]]:
     callers = sorted(
         e.source for e in graph.edges if e.edge_type == "CALLS" and e.target == pou_name
     )
@@ -150,32 +180,44 @@ def _pou_rw_vars(graph: KnowledgeGraph, pou_name: str) -> tuple[list[str], list[
     reads = sorted(
         e.target
         for e in graph.edges
-        if e.edge_type == "READS" and e.source == pou_name and e.target in graph.global_vars
+        if e.edge_type == "READS"
+        and e.source == pou_name
+        and e.target in graph.global_vars
     )
     writes = sorted(
         e.target
         for e in graph.edges
-        if e.edge_type == "WRITES" and e.source == pou_name and e.target in graph.global_vars
+        if e.edge_type == "WRITES"
+        and e.source == pou_name
+        and e.target in graph.global_vars
     )
     return reads, writes
 
 
-def _task_rw_vars(graph: KnowledgeGraph, programs: list[str]) -> tuple[list[str], list[str]]:
+def _task_rw_vars(
+    graph: KnowledgeGraph, programs: list[str]
+) -> tuple[list[str], list[str]]:
     pou_set = _task_pou_closure(graph, programs)
     reads = sorted(
         e.target
         for e in graph.edges
-        if e.edge_type == "READS" and e.source in pou_set and e.target in graph.global_vars
+        if e.edge_type == "READS"
+        and e.source in pou_set
+        and e.target in graph.global_vars
     )
     writes = sorted(
         e.target
         for e in graph.edges
-        if e.edge_type == "WRITES" and e.source in pou_set and e.target in graph.global_vars
+        if e.edge_type == "WRITES"
+        and e.source in pou_set
+        and e.target in graph.global_vars
     )
     return reads, writes
 
 
-def _task_coupling(graph: KnowledgeGraph, task_name: str, reads: list[str], writes: list[str]) -> list[str]:
+def _task_coupling(
+    graph: KnowledgeGraph, task_name: str, reads: list[str], writes: list[str]
+) -> list[str]:
     vars_used = set(reads) | set(writes)
     coupling: list[str] = []
     for other_name, task in graph.tasks.items():
@@ -194,7 +236,9 @@ def _task_pou_closure(graph: KnowledgeGraph, programs: list[str]) -> set[str]:
     while queue:
         current = queue.pop(0)
         children = [
-            e.target for e in graph.edges if e.edge_type == "CALLS" and e.source == current
+            e.target
+            for e in graph.edges
+            if e.edge_type == "CALLS" and e.source == current
         ]
         for child in children:
             if child not in closure:
@@ -202,3 +246,55 @@ def _task_pou_closure(graph: KnowledgeGraph, programs: list[str]) -> set[str]:
                 queue.append(child)
 
     return closure
+
+
+def _find_st_file(pou, project_root: Path) -> Path | None:
+    """Find the actual .st file for a POU by scanning the Logical directory."""
+    pou_name = pou.name
+    logical = project_root / "Logical"
+
+    if not logical.exists():
+        return None
+
+    # Try to find a directory matching the POU name (most common case)
+    pou_dir = logical / pou_name
+    if pou_dir.exists():
+        st_file = pou_dir / f"{pou_name}.st"
+        if st_file.exists():
+            return st_file
+
+    # Fallback: scan Logical directory for .st files with matching parent dir name
+    for st_file in logical.rglob("*.st"):
+        if st_file.parent.name == pou_name:
+            return st_file
+
+    return None
+
+
+def _write_pou_hashes(
+    graph: KnowledgeGraph, config: Config, project_root: Path | None = None
+) -> None:
+    """Write hash files for all processed POUs to track freshness."""
+    import hashlib
+
+    if project_root is None:
+        from as_docs.config import find_project_root
+
+        project_root = find_project_root() or Path(".")
+
+    cache_dir = Path(config.ai.cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    for pou_name, pou in graph.pous.items():
+        if getattr(pou, "is_external_library", False):
+            continue
+
+        # Find the actual .st file
+        st_file = _find_st_file(pou, project_root)
+        if not st_file or not st_file.exists():
+            continue
+
+        # Compute and write hash
+        content_hash = hashlib.sha256(st_file.read_bytes()).hexdigest()
+        hash_file = cache_dir / f"{pou_name}.hash"
+        hash_file.write_text(content_hash, encoding="utf-8")

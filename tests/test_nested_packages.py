@@ -1,8 +1,7 @@
 """Tests for nested package (AS6 recursive) scanning."""
+
 from __future__ import annotations
 from pathlib import Path
-
-import pytest
 
 NESTED = Path(__file__).parent / "fixtures" / "NestedProject"
 SAMPLE = Path(__file__).parent / "fixtures" / "SampleProject"
@@ -12,9 +11,11 @@ SAMPLE = Path(__file__).parent / "fixtures" / "SampleProject"
 # pkg_parser tests
 # ---------------------------------------------------------------------------
 
+
 class TestParseAs6PackageObjects:
     def test_reads_packages_and_programs(self):
         from as_docs.scanner.pkg_parser import parse_as6_package_objects
+
         pkg = NESTED / "Logical" / "Infrastructure" / "Alarms" / "Package.pkg"
         objects = parse_as6_package_objects(pkg)
         types = {o.obj_type for o in objects}
@@ -25,16 +26,19 @@ class TestParseAs6PackageObjects:
 
     def test_returns_empty_for_non_as6_file(self, tmp_path):
         from as_docs.scanner.pkg_parser import parse_as6_package_objects
+
         f = tmp_path / "Package.pkg"
         f.write_text('<Object Version="4" Name="Foo" ObjectType="661"/>')
         assert parse_as6_package_objects(f) == []
 
     def test_returns_empty_for_missing_file(self, tmp_path):
         from as_docs.scanner.pkg_parser import parse_as6_package_objects
+
         assert parse_as6_package_objects(tmp_path / "nonexistent.pkg") == []
 
     def test_reads_nested_package_refs(self):
         from as_docs.scanner.pkg_parser import parse_as6_package_objects
+
         pkg = NESTED / "Logical" / "Infrastructure" / "Package.pkg"
         objects = parse_as6_package_objects(pkg)
         types = {o.obj_type for o in objects}
@@ -44,6 +48,7 @@ class TestParseAs6PackageObjects:
 
     def test_root_package_objects(self):
         from as_docs.scanner.pkg_parser import parse_as6_package_objects
+
         pkg = NESTED / "Logical" / "Package.pkg"
         objects = parse_as6_package_objects(pkg)
         names = {o.name for o in objects}
@@ -54,6 +59,7 @@ class TestParseAs6PackageObjects:
 class TestParsePkgAs6:
     def test_iec_prg_returns_parent_dir_name(self):
         from as_docs.scanner.pkg_parser import parse_pkg
+
         iec = NESTED / "Logical" / "Infrastructure" / "Alarms" / "AlarmProg" / "IEC.prg"
         pou = parse_pkg(iec)
         assert pou is not None
@@ -62,11 +68,13 @@ class TestParsePkgAs6:
 
     def test_package_pkg_returns_none(self):
         from as_docs.scanner.pkg_parser import parse_pkg
+
         pkg = NESTED / "Logical" / "Infrastructure" / "Package.pkg"
         assert parse_pkg(pkg) is None
 
     def test_as4_prg_still_works(self):
         from as_docs.scanner.pkg_parser import parse_pkg
+
         prg = SAMPLE / "Logical" / "MainProgram" / "MainProgram.prg"
         pou = parse_pkg(prg)
         assert pou is not None
@@ -78,10 +86,12 @@ class TestParsePkgAs6:
 # Scanner integration tests
 # ---------------------------------------------------------------------------
 
+
 class TestNestedPackageScanning:
     def _scan(self, project_root=NESTED):
         from as_docs.config import Config, ScannerConfig, ProjectConfig
         from as_docs.scanner.project_scanner import scan_project
+
         config = Config(
             project=ProjectConfig(root=str(project_root)),
             scanner=ScannerConfig(recursive_packages=True, max_recursion_depth=10),
@@ -122,6 +132,7 @@ class TestNestedPackageScanning:
     def test_recursive_packages_false_disables_tree_scan(self):
         from as_docs.config import Config, ScannerConfig, ProjectConfig
         from as_docs.scanner.project_scanner import scan_project
+
         config = Config(
             project=ProjectConfig(root=str(NESTED)),
             scanner=ScannerConfig(recursive_packages=False),
@@ -135,6 +146,7 @@ class TestNestedPackageScanning:
         """AS4-format SampleProject should still scan correctly."""
         from as_docs.config import Config, ScannerConfig, ProjectConfig
         from as_docs.scanner.project_scanner import scan_project
+
         config = Config(
             project=ProjectConfig(root=str(SAMPLE)),
             scanner=ScannerConfig(recursive_packages=True),
@@ -161,14 +173,14 @@ class TestCircularReferenceDetection:
             '<?xml version="1.0" encoding="utf-8"?>\n'
             '<Package xmlns="http://br-automation.co.at/AS/Package">'
             '<Objects><Object Type="Package">PkgA</Object></Objects>'
-            '</Package>'
+            "</Package>"
         )
         # PkgA's Package.pkg points back to "PkgA" (same dir — canonical path matches)
         (pkg_a / "Package.pkg").write_text(
             '<?xml version="1.0" encoding="utf-8"?>\n'
             '<Package xmlns="http://br-automation.co.at/AS/Package">'
             '<Objects><Object Type="Package">PkgA</Object></Objects>'
-            '</Package>'
+            "</Package>"
         )
 
         config = Config(
@@ -197,7 +209,7 @@ class TestMaxRecursionDepth:
                 '<?xml version="1.0" encoding="utf-8"?>\n'
                 '<Package xmlns="http://br-automation.co.at/AS/Package">'
                 f'<Objects><Object Type="Package">Level{i}</Object></Objects>'
-                '</Package>'
+                "</Package>"
             )
             current = child
 

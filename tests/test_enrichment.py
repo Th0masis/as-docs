@@ -39,8 +39,12 @@ class DummyProvider:
 def _graph(tmp_path: Path) -> KnowledgeGraph:
     pou_dir = tmp_path / "Logical" / "MainProgram"
     pou_dir.mkdir(parents=True)
-    (pou_dir / "Main.st").write_text("PROGRAM Main\ngMotorSpeed := 1.0;", encoding="utf-8")
-    (pou_dir / "MainProgram.prg").write_text("<Object Name=\"MainProgram\" />", encoding="utf-8")
+    (pou_dir / "Main.st").write_text(
+        "PROGRAM Main\ngMotorSpeed := 1.0;", encoding="utf-8"
+    )
+    (pou_dir / "MainProgram.prg").write_text(
+        '<Object Name="MainProgram" />', encoding="utf-8"
+    )
 
     return KnowledgeGraph(
         schema_version="1.0",
@@ -97,7 +101,9 @@ def test_enrichment_populates_task_and_pou(monkeypatch, tmp_path: Path) -> None:
     graph = _graph(tmp_path)
     cfg = _cfg(tmp_path)
 
-    monkeypatch.setattr("as_docs.enricher.ai_enricher.create_provider", lambda _cfg: provider)
+    monkeypatch.setattr(
+        "as_docs.enricher.ai_enricher.create_provider", lambda _cfg: provider
+    )
 
     stats = enrich_graph(graph, level=3, config=cfg)
 
@@ -115,7 +121,9 @@ def test_enrichment_uses_cache_on_second_run(monkeypatch, tmp_path: Path) -> Non
     graph = _graph(tmp_path)
     cfg = _cfg(tmp_path)
 
-    monkeypatch.setattr("as_docs.enricher.ai_enricher.create_provider", lambda _cfg: provider)
+    monkeypatch.setattr(
+        "as_docs.enricher.ai_enricher.create_provider", lambda _cfg: provider
+    )
 
     first = enrich_graph(graph, level=3, config=cfg)
     second = enrich_graph(graph, level=3, config=cfg)
@@ -130,7 +138,9 @@ def test_level3_generates_task_and_pou_markdown(monkeypatch, tmp_path: Path) -> 
     fixture = Path(__file__).parent / "fixtures" / "SampleProject"
 
     provider = DummyProvider()
-    monkeypatch.setattr("as_docs.enricher.ai_enricher.create_provider", lambda _cfg: provider)
+    monkeypatch.setattr(
+        "as_docs.enricher.ai_enricher.create_provider", lambda _cfg: provider
+    )
 
     cfg = Config()
     cfg.project.name = "SampleProject"

@@ -1,10 +1,14 @@
 """Markdown generator — produces overview.md, architecture.md, global_vars.md, data_types.md."""
+
 from __future__ import annotations
 from pathlib import Path
 
 from as_docs.model.graph import KnowledgeGraph
 from as_docs.analyzer.xref_builder import build_xrefs
-from as_docs.generator.diagram_gen import generate_architecture_diagram, generate_data_flow_diagram
+from as_docs.generator.diagram_gen import (
+    generate_architecture_diagram,
+    generate_data_flow_diagram,
+)
 from as_docs.generator.flow_diagram_gen import generate_flow_markdown
 
 
@@ -35,13 +39,14 @@ def generate_all_markdown(graph: KnowledgeGraph, output_dir: Path) -> list[Path]
 # overview.md
 # ---------------------------------------------------------------------------
 
+
 def _write_overview(graph: KnowledgeGraph, output_dir: Path) -> Path:
     path = output_dir / "overview.md"
     lines = [
         f"# {graph.project_name}",
         "",
-        f"| Field | Value |",
-        f"|---|---|",
+        "| Field | Value |",
+        "|-|----|",
         f"| AS Version | {graph.as_version or '—'} |",
         f"| Active Configuration | {graph.active_configuration or '—'} |",
         f"| Generated | {graph.generated_at[:19].replace('T', ' ')} |",
@@ -93,6 +98,7 @@ def _write_overview(graph: KnowledgeGraph, output_dir: Path) -> Path:
 # architecture.md
 # ---------------------------------------------------------------------------
 
+
 def _write_architecture(graph: KnowledgeGraph, output_dir: Path) -> Path:
     path = output_dir / "architecture.md"
     diagram = generate_architecture_diagram(graph)
@@ -114,6 +120,7 @@ def _write_architecture(graph: KnowledgeGraph, output_dir: Path) -> Path:
 # ---------------------------------------------------------------------------
 # global_vars.md
 # ---------------------------------------------------------------------------
+
 
 def _write_global_vars(graph: KnowledgeGraph, output_dir: Path) -> Path:
     path = output_dir / "global_vars.md"
@@ -164,6 +171,7 @@ def _write_global_vars(graph: KnowledgeGraph, output_dir: Path) -> Path:
 # ---------------------------------------------------------------------------
 # data_types.md
 # ---------------------------------------------------------------------------
+
 
 def _write_data_types(graph: KnowledgeGraph, output_dir: Path) -> Path:
     path = output_dir / "data_types.md"
@@ -224,6 +232,7 @@ def _write_data_types(graph: KnowledgeGraph, output_dir: Path) -> Path:
 # data_flow.md  (Level 2+)
 # ---------------------------------------------------------------------------
 
+
 def _write_data_flow(graph: KnowledgeGraph, output_dir: Path) -> Path:
     path = output_dir / "data_flow.md"
     diagram = generate_data_flow_diagram(graph)
@@ -244,6 +253,7 @@ def _write_data_flow(graph: KnowledgeGraph, output_dir: Path) -> Path:
 # ---------------------------------------------------------------------------
 # tasks/*.md  (Level 2+)
 # ---------------------------------------------------------------------------
+
 
 def _write_task_pages(graph: KnowledgeGraph, output_dir: Path) -> list[Path]:
     tasks_dir = output_dir / "tasks"
@@ -289,17 +299,23 @@ def _write_task_pages(graph: KnowledgeGraph, output_dir: Path) -> list[Path]:
     return produced
 
 
-def _task_rw_vars(graph: KnowledgeGraph, programs: list[str]) -> tuple[list[str], list[str]]:
+def _task_rw_vars(
+    graph: KnowledgeGraph, programs: list[str]
+) -> tuple[list[str], list[str]]:
     closure = _task_pou_closure(graph, programs)
     reads = sorted(
         e.target
         for e in graph.edges
-        if e.edge_type == "READS" and e.source in closure and e.target in graph.global_vars
+        if e.edge_type == "READS"
+        and e.source in closure
+        and e.target in graph.global_vars
     )
     writes = sorted(
         e.target
         for e in graph.edges
-        if e.edge_type == "WRITES" and e.source in closure and e.target in graph.global_vars
+        if e.edge_type == "WRITES"
+        and e.source in closure
+        and e.target in graph.global_vars
     )
     return reads, writes
 
@@ -310,7 +326,9 @@ def _task_pou_closure(graph: KnowledgeGraph, programs: list[str]) -> set[str]:
     while queue:
         current = queue.pop(0)
         callees = [
-            e.target for e in graph.edges if e.edge_type == "CALLS" and e.source == current
+            e.target
+            for e in graph.edges
+            if e.edge_type == "CALLS" and e.source == current
         ]
         for callee in callees:
             if callee not in closure:
@@ -319,7 +337,9 @@ def _task_pou_closure(graph: KnowledgeGraph, programs: list[str]) -> set[str]:
     return closure
 
 
-def _task_coupling(graph: KnowledgeGraph, task_name: str, var_set: set[str]) -> list[str]:
+def _task_coupling(
+    graph: KnowledgeGraph, task_name: str, var_set: set[str]
+) -> list[str]:
     coupled: list[str] = []
     for other_name, other in sorted(graph.tasks.items()):
         if other_name == task_name:
@@ -334,6 +354,7 @@ def _task_coupling(graph: KnowledgeGraph, task_name: str, var_set: set[str]) -> 
 # pou/*.md  (Level 3+)
 # ---------------------------------------------------------------------------
 
+
 def _write_pou_pages(graph: KnowledgeGraph, output_dir: Path) -> list[Path]:
     pou_dir = output_dir / "pou"
     pou_dir.mkdir(parents=True, exist_ok=True)
@@ -344,20 +365,28 @@ def _write_pou_pages(graph: KnowledgeGraph, output_dir: Path) -> list[Path]:
             continue
 
         callers = sorted(
-            e.source for e in graph.edges if e.edge_type == "CALLS" and e.target == pou_name
+            e.source
+            for e in graph.edges
+            if e.edge_type == "CALLS" and e.target == pou_name
         )
         callees = sorted(
-            e.target for e in graph.edges if e.edge_type == "CALLS" and e.source == pou_name
+            e.target
+            for e in graph.edges
+            if e.edge_type == "CALLS" and e.source == pou_name
         )
         reads = sorted(
             e.target
             for e in graph.edges
-            if e.edge_type == "READS" and e.source == pou_name and e.target in graph.global_vars
+            if e.edge_type == "READS"
+            and e.source == pou_name
+            and e.target in graph.global_vars
         )
         writes = sorted(
             e.target
             for e in graph.edges
-            if e.edge_type == "WRITES" and e.source == pou_name and e.target in graph.global_vars
+            if e.edge_type == "WRITES"
+            and e.source == pou_name
+            and e.target in graph.global_vars
         )
 
         path = pou_dir / f"{pou_name}.md"

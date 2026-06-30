@@ -1,4 +1,5 @@
 """Parser for .var files — extracts variable declarations."""
+
 from __future__ import annotations
 import re
 from pathlib import Path
@@ -97,7 +98,14 @@ def _parse_var_line(
     trailing = m.group(4).strip()
 
     # Skip keywords accidentally matched
-    if name.upper() in ("END_VAR", "VAR", "VAR_GLOBAL", "VAR_INPUT", "VAR_OUTPUT", "VAR_IN_OUT"):
+    if name.upper() in (
+        "END_VAR",
+        "VAR",
+        "VAR_GLOBAL",
+        "VAR_INPUT",
+        "VAR_OUTPUT",
+        "VAR_IN_OUT",
+    ):
         return None
 
     description = ""

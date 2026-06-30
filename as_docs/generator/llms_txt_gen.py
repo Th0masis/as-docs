@@ -1,6 +1,6 @@
 """llms.txt index generator — AI agent entry point."""
+
 from __future__ import annotations
-from datetime import datetime
 from pathlib import Path
 
 from as_docs.model.graph import KnowledgeGraph
@@ -35,13 +35,20 @@ def generate_llms_txt(graph: KnowledgeGraph, output_dir: Path) -> Path:
     if graph.tasks:
         lines.append("## Tasks")
         for task_name, task in sorted(graph.tasks.items()):
-            interval = f"{task.cycle_time_ms}ms" if task.cycle_time_ms else task.task_type
-            progs = ", ".join(task.programs) if task.programs else "—"
-            desc = task.description.split(".")[0] if task.description else f"{interval}, {len(task.programs)} program(s)"
+            interval = (
+                f"{task.cycle_time_ms}ms" if task.cycle_time_ms else task.task_type
+            )
+            desc = (
+                task.description.split(".")[0]
+                if task.description
+                else f"{interval}, {len(task.programs)} program(s)"
+            )
             if graph.level >= 2:
                 lines.append(f"tasks/{task_name}.md    {desc}")
             else:
-                lines.append(f"# tasks/{task_name}.md    {desc} [Level 2 not generated]")
+                lines.append(
+                    f"# tasks/{task_name}.md    {desc} [Level 2 not generated]"
+                )
         lines.append("")
 
     # POUs section
@@ -61,8 +68,12 @@ def generate_llms_txt(graph: KnowledgeGraph, output_dir: Path) -> Path:
     if graph.flow_diagrams:
         lines.append("## Flow diagrams (Level 4)")
         for pou_name, fd in sorted(graph.flow_diagrams.items()):
-            confidence_icon = {"HIGH": "🟢", "MEDIUM": "🟡", "LOW": "🔴"}.get(fd.confidence, "")
-            lines.append(f"pou/{pou_name}.flow.md    {fd.diagram_type} — {confidence_icon} {fd.source}")
+            confidence_icon = {"HIGH": "🟢", "MEDIUM": "🟡", "LOW": "🔴"}.get(
+                fd.confidence, ""
+            )
+            lines.append(
+                f"pou/{pou_name}.flow.md    {fd.diagram_type} — {confidence_icon} {fd.source}"
+            )
         lines.append("")
 
     out_path.write_text("\n".join(lines), encoding="utf-8")

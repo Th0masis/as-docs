@@ -1,4 +1,5 @@
 """Cross-reference builder — maps variables to the POUs that read/write them."""
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from as_docs.model.graph import Edge
@@ -7,8 +8,8 @@ from as_docs.model.graph import Edge
 @dataclass
 class VariableXRef:
     var_name: str
-    readers: list[str] = field(default_factory=list)   # POU names
-    writers: list[str] = field(default_factory=list)   # POU names
+    readers: list[str] = field(default_factory=list)  # POU names
+    writers: list[str] = field(default_factory=list)  # POU names
 
 
 def build_xrefs(edges: list[Edge]) -> dict[str, VariableXRef]:
