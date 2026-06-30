@@ -12,6 +12,7 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 from as_docs.config import Config, find_project_root, load_config
+from as_docs.scanner.as_cli_adapter import AsCliAdapter, AsCliError
 
 
 @click.group()
@@ -166,10 +167,15 @@ git:
 @cli.command()
 @click.option("--level", default=None, type=int, help="Documentation level (1–4). Default from config.")
 @click.option("--no-ai", "no_ai", is_flag=True, help="Skip AI enrichment (Level 1 only).")
+@click.option("--use-as-cli", "use_as_cli", is_flag=True, help="Enable as-cli integration (if available). Overrides config.")
 @click.option("--config", "config_path", default=None, type=click.Path(), help="Path to .as-docs.yaml")
 @click.pass_context
-def generate(ctx: click.Context, level: int | None, no_ai: bool, config_path: str | None) -> None:
-    """Generate documentation for the AS project."""
+def generate(ctx: click.Context, level: int | None, no_ai: bool, use_as_cli: bool, config_path: str | None) -> None:
+    """Generate documentation for the AS project.
+    
+    By default, uses filesystem scanner. With --use-as-cli, attempts to merge
+    as-cli data (if available). Falls back to filesystem if as-cli unavailable.
+    """
     from as_docs.engine import run_generate
 
     cfg = _load_cfg(config_path)
@@ -181,9 +187,11 @@ def generate(ctx: click.Context, level: int | None, no_ai: bool, config_path: st
         click.echo(
             f"🤖  AI enrichment enabled (provider: {cfg.ai.provider}, model: {cfg.ai.model})"
         )
+    if use_as_cli:
+        click.echo("🔧  as-cli integration enabled (will merge if available)")
 
     try:
-        graph = run_generate(cfg, level=effective_level, ai_enabled=ai_enabled)
+        graph = run_generate(cfg, level=effective_level, ai_enabled=ai_enabled, use_as_cli=use_as_cli)
         out = Path(cfg.output.docs_dir)
         click.echo(f"\n✅  Done — {len(graph.pous)} POUs, {len(graph.tasks)} tasks")
         if ai_enabled:
@@ -192,6 +200,23 @@ def generate(ctx: click.Context, level: int | None, no_ai: bool, config_path: st
                 click.echo(
                     f"📊  AI cache: hits={stats.hits}, misses={stats.misses}, writes={stats.writes}"
                 )
+        
+        # Show as-cli merge report if available
+        meta = getattr(graph, "_regen_meta", {})
+        as_cli_report = meta.get("as_cli_merge_report")
+        if as_cli_report:
+            click.echo(f"\n🔀  as-cli merge report:")
+            click.echo(f"    Filesystem: {as_cli_report['pou_count_fs']} POUs")
+            click.echo(f"    as-cli: {as_cli_report['pou_count_as_cli']} POUs")
+            click.echo(f"    Merged: {as_cli_report['pou_count_merged']} POUs")
+            if as_cli_report['conflicts']:
+                click.echo(f"    ⚠️  Conflicts: {len(as_cli_report['conflicts'])}")
+                for conflict in as_cli_report['conflicts'][:3]:
+                    click.echo(f"       - {conflict['pou_name']}: {conflict['conflict_type']}")
+                if len(as_cli_report['conflicts']) > 3:
+                    click.echo(f"       ... and {len(as_cli_report['conflicts']) - 3} more")
+            click.echo(f"    Full report: {out.resolve() / 'as_cli_conflict_report.json'}")
+        
         click.echo(f"📁  Output: {out.resolve()}")
     except FileNotFoundError as e:
         click.echo(f"❌  {e}", err=True)
@@ -199,6 +224,110 @@ def generate(ctx: click.Context, level: int | None, no_ai: bool, config_path: st
     except RuntimeError as e:
         click.echo(f"❌  {e}", err=True)
         sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# as-docs as-cli-check
+# ---------------------------------------------------------------------------
+
+@cli.command("as-cli-check")
+@click.option("--config", "config_path", default=None, type=click.Path(), help="Path to .as-docs.yaml")
+def as_cli_check(config_path: str | None) -> None:
+    """Diagnose as-cli integration and availability.
+    
+    Checks if as-cli is installed, accessible, and can communicate with an
+    Automation Studio project. Useful for troubleshooting integration issues.
+    """
+    cfg = _load_cfg(config_path)
+    
+    click.echo("🔧  Diagnosing as-cli integration...\n")
+    
+    # Step 1: Check configuration
+    click.echo("1️⃣   Configuration:")
+    click.echo(f"    Enabled: {cfg.as_cli.enabled}")
+    click.echo(f"    Path: {cfg.as_cli.path}")
+    click.echo(f"    Timeout: {cfg.as_cli.timeout_ms}ms")
+    click.echo(f"    Strict mode: {cfg.as_cli.strict}")
+    click.echo(f"    Commands: {', '.join(cfg.as_cli.use_commands)}")
+    click.echo()
+    
+    # Step 2: Check availability
+    click.echo("2️⃣   Availability check:")
+    adapter = AsCliAdapter(
+        as_cli_path=cfg.as_cli.path,
+        timeout_ms=2000  # Quick check timeout
+    )
+    
+    as_cli_available = False
+    try:
+        if adapter.is_available():
+            click.echo("    ✅  as-cli is installed and accessible")
+            as_cli_available = True
+        else:
+            click.echo("    ❌  as-cli is not available")
+            click.echo("\n    Troubleshooting:")
+            click.echo("    - Ensure as-cli is installed")
+            click.echo("    - Check that as-cli is in your PATH")
+            click.echo("    - Try: as-cli --version")
+    except Exception as e:
+        click.echo(f"    ❌  Error checking availability: {e}")
+    
+    click.echo()
+    
+    # Only proceed to steps 3-4 if as-cli is available
+    if as_cli_available:
+        # Step 3: Try to connect to daemon or start one
+        click.echo("3️⃣   Daemon connectivity:")
+        try:
+            # This will auto-start daemon if needed
+            adapter._ensure_daemon()
+            click.echo("    ✅  Connected to daemon (or started new one)")
+        except Exception as e:
+            click.echo(f"    ⚠️   Daemon issue: {e}")
+            click.echo("    Note: This may be temporary; retry later")
+        
+        click.echo()
+        
+        # Step 4: Try basic commands
+        click.echo("4️⃣   Command availability:")
+        
+        try:
+            # Try logical_list
+            if "logical_list" in cfg.as_cli.use_commands:
+                try:
+                    result = adapter.get_logical_list()
+                    modules = result.get("modules", [])
+                    click.echo(f"    ✅  logical_list: {len(modules)} modules found")
+                except AsCliError as e:
+                    click.echo(f"    ⚠️   logical_list failed: {e}")
+            
+            # Try symbol_search
+            if "symbol_search" in cfg.as_cli.use_commands:
+                try:
+                    result = adapter.get_symbol_search("*")
+                    symbols = result.get("symbols", {})
+                    click.echo(f"    ✅  symbol_search: {len(symbols)} symbols found")
+                except AsCliError as e:
+                    click.echo(f"    ⚠️   symbol_search failed: {e}")
+        except Exception as e:
+            click.echo(f"    ❌  Error running commands: {e}")
+        
+        click.echo()
+    
+    # Step 5: Configuration recommendations
+    click.echo("5️⃣   Recommendations:")
+    if not cfg.as_cli.enabled:
+        click.echo("    • Enable as-cli in .as-docs.yaml: as_cli.enabled: true")
+    else:
+        click.echo("    • as-cli is enabled in config ✓")
+    
+    if cfg.as_cli.strict:
+        click.echo("    • Running in strict mode (will fail if as-cli unavailable)")
+    else:
+        click.echo("    • Running in graceful fallback mode (recommended)")
+    
+    click.echo()
+    click.echo("✅  Diagnostic complete!")
 
 
 # ---------------------------------------------------------------------------
