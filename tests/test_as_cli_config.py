@@ -1,6 +1,5 @@
 """Tests for as-cli configuration loading and validation."""
 import pytest
-from pathlib import Path
 from as_docs.config import (
     Config,
     AsCliConfig,

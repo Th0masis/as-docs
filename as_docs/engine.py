@@ -6,7 +6,7 @@ from time import perf_counter
 import logging
 from typing import TYPE_CHECKING
 
-from as_docs.config import Config, load_config
+from as_docs.config import Config
 from as_docs.model.graph import (
     SCHEMA_VERSION,
     Edge,
@@ -149,8 +149,6 @@ def _merge_as_cli_data(model: ProjectModel, config: Config, project_root: Path |
     Returns:
         ConflictReport if merge was successful, None if fallback only (graceful)
     """
-    from as_docs.scanner.data_conflict_resolver import ConflictReport
-    
     logger.info("Attempting as-cli integration...")
     
     try:

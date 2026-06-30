@@ -90,7 +90,6 @@ def _state_mermaid(extracted: FlowExtractionResult) -> str:
 def _flowchart_mermaid(extracted: FlowExtractionResult) -> str:
     lines = ["flowchart TD"]
     for node in extracted.nodes:
-        shape = "[" if node.node_type in {"action", "branch"} else "(" if node.node_type == "start" else "["
         if node.node_type == "branch":
             lines.append(f'    {_safe_id(node.node_id)}{{"{node.label}"}}')
         elif node.node_type == "start":

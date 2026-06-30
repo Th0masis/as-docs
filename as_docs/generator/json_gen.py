@@ -2,7 +2,6 @@
 from __future__ import annotations
 import dataclasses
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 
 from as_docs.model.graph import KnowledgeGraph

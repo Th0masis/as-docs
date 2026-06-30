@@ -2,8 +2,6 @@
 from __future__ import annotations
 from pathlib import Path
 
-import pytest
-
 NESTED = Path(__file__).parent / "fixtures" / "NestedProject"
 SAMPLE = Path(__file__).parent / "fixtures" / "SampleProject"
 

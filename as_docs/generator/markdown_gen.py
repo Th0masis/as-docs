@@ -40,8 +40,8 @@ def _write_overview(graph: KnowledgeGraph, output_dir: Path) -> Path:
     lines = [
         f"# {graph.project_name}",
         "",
-        f"| Field | Value |",
-        f"|---|---|",
+        "| Field | Value |",
+        "|-|----|",
         f"| AS Version | {graph.as_version or '—'} |",
         f"| Active Configuration | {graph.active_configuration or '—'} |",
         f"| Generated | {graph.generated_at[:19].replace('T', ' ')} |",

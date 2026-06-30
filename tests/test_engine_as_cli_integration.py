@@ -331,7 +331,7 @@ class TestRunGenerateWithAsCli:
             mock_merge.return_value = None  # Graceful fallback
             
             # Call with CLI override
-            result = run_generate(config, level=1, use_as_cli=True)
+            run_generate(config, level=1, use_as_cli=True)
             
             # Merge should be called because CLI override
             mock_merge.assert_called_once()

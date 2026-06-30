@@ -10,7 +10,7 @@ from typing import Any, Optional
 import json
 import logging
 
-from .as_cli_models import AsCliProjectData, AsCliModule
+from .as_cli_models import AsCliProjectData
 
 logger = logging.getLogger(__name__)
 

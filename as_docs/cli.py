@@ -213,7 +213,7 @@ def generate(ctx: click.Context, level: int | None, no_ai: bool, use_as_cli: boo
         meta = getattr(graph, "_regen_meta", {})
         as_cli_report = meta.get("as_cli_merge_report")
         if as_cli_report:
-            click.echo(f"\nas-cli merge report:")
+            click.echo("\nas-cli merge report:")
             click.echo(f"    Filesystem: {as_cli_report['pou_count_fs']} POUs")
             click.echo(f"    as-cli: {as_cli_report['pou_count_as_cli']} POUs")
             click.echo(f"    Merged: {as_cli_report['pou_count_merged']} POUs")

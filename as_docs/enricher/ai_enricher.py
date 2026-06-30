@@ -216,8 +216,6 @@ def _task_pou_closure(graph: KnowledgeGraph, programs: list[str]) -> set[str]:
 
 def _find_st_file(pou, project_root: Path) -> Path | None:
     """Find the actual .st file for a POU by scanning the Logical directory."""
-    import hashlib
-    
     pou_name = pou.name
     logical = project_root / "Logical"
     

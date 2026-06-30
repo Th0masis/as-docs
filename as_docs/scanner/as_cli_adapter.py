@@ -12,16 +12,11 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
-import shutil
-from pathlib import Path
-from typing import Optional, Any
-from dataclasses import asdict
+from typing import Optional
 import time
 
 from .as_cli_models import (
     AsCliProjectData,
-    AsCliModule,
-    AsCliSymbol,
     parse_logical_list_output,
     parse_symbol_search_output,
 )

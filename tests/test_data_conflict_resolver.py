@@ -1,6 +1,5 @@
 """Tests for data conflict resolver (merge logic, conflict detection)."""
 import pytest
-from datetime import datetime
 
 from as_docs.scanner.data_conflict_resolver import (
     Conflict,
@@ -10,7 +9,6 @@ from as_docs.scanner.data_conflict_resolver import (
 from as_docs.scanner.as_cli_models import (
     AsCliProjectData,
     AsCliModule,
-    AsCliSymbol,
 )
 
 

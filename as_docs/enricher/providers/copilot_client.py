@@ -194,7 +194,7 @@ def _resolve_github_token_via_device_flow(client_id: str) -> str | None:
         return None
 
     # Step 2: prompt the user.
-    print(f"\n  GitHub OAuth — Device Flow")
+    print("\n  GitHub OAuth — Device Flow")
     print(f"  1. Open:       {verification_uri}")
     print(f"  2. Enter code: {user_code}")
     print(f"  Waiting for authorization (expires in {expires_in}s) ...\n")

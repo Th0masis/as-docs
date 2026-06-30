@@ -1,6 +1,6 @@
 """Tests for as-cli adapter (command execution, daemon management, parsing)."""
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import json
 import subprocess
 
@@ -14,8 +14,6 @@ from as_docs.scanner.as_cli_adapter import (
 )
 from as_docs.scanner.as_cli_models import (
     AsCliProjectData,
-    AsCliModule,
-    AsCliSymbol,
 )
 
 

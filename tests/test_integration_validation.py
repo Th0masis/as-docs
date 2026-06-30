@@ -7,7 +7,6 @@ Comprehensive testing for as-cli integration:
 - Performance baselines
 """
 
-import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -16,7 +15,6 @@ from click.testing import CliRunner
 
 from as_docs.cli import cli, generate, as_cli_check
 from as_docs.config import Config, AsCliConfig
-from as_docs.engine import run_generate
 from as_docs.scanner.as_cli_adapter import AsCliAdapter, AsCliError
 
 
@@ -212,7 +210,6 @@ class TestMergeStrategyValidation:
     def test_merge_combines_filesystem_and_as_cli_results(self):
         """Union merge should include POUs from both sources."""
         # This test validates the merge strategy logic
-        from as_docs.scanner.data_conflict_resolver import DataConflictResolver
         
         # Simulate filesystem discovery
         fs_model = MagicMock()
@@ -228,7 +225,6 @@ class TestMergeStrategyValidation:
             MagicMock(name="Prog3", path="/Physical/Programs/Prog3"),  # Different
         ]
         
-        resolver = DataConflictResolver()
         # Merge should include all 3 POUs
         merged = fs_model.pous + as_cli_model.pous
         
@@ -388,7 +384,7 @@ output:
                 MockScan.return_value = mock_model
                 
                 start = time.time()
-                result = runner.invoke(generate)
+                runner.invoke(generate)
                 elapsed = time.time() - start
                 
                 # Should complete quickly (< 5 seconds for mocked test)

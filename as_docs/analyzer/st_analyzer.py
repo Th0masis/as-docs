@@ -18,7 +18,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from as_docs.model.graph import Edge, Variable
 from as_docs.model.project import RawSTFile
 
 # ---------------------------------------------------------------------------
@@ -91,8 +90,6 @@ def analyze_st(
     """Analyze a single .st file and return calls, reads, writes."""
     result = STAnalysisResult(pou_name=st_file.pou_name)
     source = _strip_comments(st_file.source)
-
-    ext_prefixes = tuple(external_prefixes or [])
 
     # Detect flow structures
     result.has_case = bool(_CASE_RE.search(source))

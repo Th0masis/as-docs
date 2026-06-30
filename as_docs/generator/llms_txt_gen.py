@@ -1,6 +1,5 @@
 """llms.txt index generator — AI agent entry point."""
 from __future__ import annotations
-from datetime import datetime
 from pathlib import Path
 
 from as_docs.model.graph import KnowledgeGraph
@@ -36,7 +35,6 @@ def generate_llms_txt(graph: KnowledgeGraph, output_dir: Path) -> Path:
         lines.append("## Tasks")
         for task_name, task in sorted(graph.tasks.items()):
             interval = f"{task.cycle_time_ms}ms" if task.cycle_time_ms else task.task_type
-            progs = ", ".join(task.programs) if task.programs else "—"
             desc = task.description.split(".")[0] if task.description else f"{interval}, {len(task.programs)} program(s)"
             if graph.level >= 2:
                 lines.append(f"tasks/{task_name}.md    {desc}")
