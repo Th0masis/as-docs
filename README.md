@@ -74,6 +74,127 @@ as-docs status
 # max_recursion_depth: 5          (reduce depth limit)
 ```
 
+## as-cli Integration
+
+**Automation Studio Project Discovery via as-cli**
+
+For improved project discovery and more accurate POU detection (especially with nested packages), `as-docs` can optionally use [as-cli](https://github.com/br-automation-com/as-cli), a C# CLI tool for B&R Automation Studio.
+
+### What is as-cli?
+
+- Windows-only command-line tool for Automation Studio project inspection
+- Daemon-based architecture using Windows named pipes
+- Provides accurate `logical_list` (modules, tasks, programs) and `symbol_search` (all symbols)
+- Catches implicit programs and nested package hierarchies that filesystem scanning may miss
+
+### Setup
+
+1. **Install as-cli** from the [official repository](https://github.com/br-automation-com/as-cli)
+2. **Enable in config** (`.as-docs.yaml`):
+   ```yaml
+   as_cli:
+     enabled: true
+     path: "as-cli"           # auto-detect from PATH
+     timeout_ms: 30000        # per-command timeout
+     strict: false            # graceful fallback (recommended)
+     use_commands:
+       - logical_list
+       - symbol_search
+   ```
+3. **Test availability** with the diagnostic command:
+   ```bash
+   as-docs as-cli-check
+   ```
+
+### Usage
+
+**Option 1: Enable in config (persistent)**
+```bash
+as-docs generate              # uses as-cli if enabled in .as-docs.yaml
+```
+
+**Option 2: CLI flag (one-time override)**
+```bash
+as-docs generate --use-as-cli  # enable for this run, regardless of config
+```
+
+### Merge Strategy
+
+When as-cli is enabled and available:
+- `as-docs` scans the filesystem *and* queries as-cli independently
+- Results are merged using a **union strategy**: all POUs from both sources are included
+- **as-cli is the source of truth** for conflicts (e.g., POU path or type differs)
+- A **conflict report** is generated and saved to `docs/as-docs/as_cli_conflicts.json`
+- Conflict report is also displayed in the CLI output under `[as-cli Merge Report]`
+
+### Graceful Fallback (Recommended)
+
+Default configuration uses **graceful fallback mode** (`strict: false`):
+- If as-cli is unavailable or errors occur, `as-docs` automatically falls back to filesystem scanning
+- No errors or warnings — documentation generation completes successfully
+- **Zero changes to existing workflows** if as-cli is not installed
+
+### Strict Mode (Optional)
+
+For strict validation, set `strict: true`:
+```yaml
+as_cli:
+  enabled: true
+  strict: true    # fail if as-cli is unavailable or errors occur
+```
+
+This is useful in CI/CD pipelines where you want to guarantee accurate discovery.
+
+### Troubleshooting
+
+Run the diagnostic command to check as-cli integration status:
+```bash
+as-docs as-cli-check
+```
+
+This performs 5 checks:
+1. **Configuration Display** — shows current as_cli settings
+2. **Availability Check** — verifies as-cli is installed and in PATH
+3. **Daemon Connectivity** — confirms connection or auto-start
+4. **Command Availability** — tests logical_list and symbol_search
+5. **Recommendations** — suggests next steps based on config state
+
+Example output:
+```
+🔧  Diagnosing as-cli integration...
+
+1️⃣   Configuration:
+    Enabled: True
+    Path: as-cli
+    Timeout: 30000ms
+    Strict mode: False
+    Commands: logical_list, symbol_search
+
+2️⃣   Availability check:
+    ✅  as-cli is installed and accessible
+
+3️⃣   Daemon connectivity:
+    ✅  Connected to daemon (or started new one)
+
+4️⃣   Command availability:
+    ✅  logical_list: 5 modules found
+    ✅  symbol_search: 142 symbols found
+
+5️⃣   Recommendations:
+    • as-cli is enabled in config ✓
+    • Running in graceful fallback mode (recommended)
+
+✅  Diagnostic complete!
+```
+
+### When to Use as-cli
+
+- **Recommended:** Projects with nested packages (AS6+) or complex hierarchies
+- **Optional:** Small projects where filesystem scanning is sufficient
+- **Required:** If you need guaranteed detection of implicit programs
+
+For most users, **filesystem scanning is sufficient**. Enable as-cli only if you encounter missed POUs.
+
 ## Documentation Levels
 
 | Level | AI Calls | Time | Output |
@@ -123,15 +244,16 @@ Add to `.vscode/mcp.json`:
 ## CLI Reference
 
 ```bash
-as-docs init [--http] [--mcp]             # setup
-as-docs generate [--level 1-4] [--no-ai] # generate docs
-as-docs upgrade --to N [--pou NAME]       # upgrade to higher level
-as-docs status                            # freshness report
-as-docs cache clear [--pou NAME]          # clear AI cache
-as-docs serve [--http --port 8765]        # MCP server
-as-docs watch [--level N] [--debounce-ms N] # daemon mode
-as-docs install-hook [--yes] [--force]     # git post-commit hook
-as-docs diff HEAD~1                       # changed POUs since commit
+as-docs init [--http] [--mcp]                    # setup
+as-docs generate [--level 1-4] [--no-ai] [--use-as-cli] # generate docs (optionally with as-cli)
+as-docs as-cli-check                             # diagnose as-cli integration
+as-docs upgrade --to N [--pou NAME]              # upgrade to higher level
+as-docs status                                   # freshness report
+as-docs cache clear [--pou NAME]                 # clear AI cache
+as-docs serve [--http --port 8765]               # MCP server
+as-docs watch [--level N] [--debounce-ms N]      # daemon mode
+as-docs install-hook [--yes] [--force]           # git post-commit hook
+as-docs diff HEAD~1                              # changed POUs since commit
 ```
 
 Scoped behavior notes:
@@ -237,19 +359,34 @@ The raw token is **never stored on the provider object** — the Copilot SDK han
 
 Anthropic provider reads the key from `ai.api_key_env` (for example `ANTHROPIC_API_KEY`) and initializes the Anthropic SDK directly.
 
-## Current Status (2026-06-25)
+## Current Status (2026-06-30)
 
+**Phase 2.5 - CLI Updates (COMPLETE)**
+- ✅ `--use-as-cli` flag for `generate` command with CLI > config > default precedence
+- ✅ `as-cli-check` diagnostic command with 5-step troubleshooting workflow
+- ✅ 11 comprehensive CLI integration tests (100% passing)
+- ✅ Backward compatibility maintained (default: as_cli.enabled=false)
+
+**Phases 1-2.4 - as-cli Integration (COMPLETE)**
+- ✅ Config system with AsCliConfig validation
+- ✅ AsCliAdapter for subprocess execution and daemon lifecycle
+- ✅ DataConflictResolver for smart merge and conflict reporting
+- ✅ Engine integration with graceful fallback and strict mode
+- ✅ 84 unit tests (100% passing)
+
+**Phases 0-4 - Core as-docs (COMPLETE)**
 - Implemented: FastMCP server with stdio and HTTP transports (`as-docs serve`, `as-docs serve --http --port 8765`)
 - Implemented read tools: `get_overview`, `get_pou_list`, `get_pou`, `get_task`, `find_variable`, `get_data_flow`, `get_call_graph`, `get_global_vars`, `search`, `get_flow_diagram`
 - Implemented action tools: `regenerate`, `get_cache_status`, `upgrade`
-- Implemented level-aware MCP responses with `status: partial`, `available_level`, `requested_level`, and upgrade hints when a higher level is required
-- Implemented MCP payload + behavior tests for Phase 3 (`tests/test_phase3_mcp_server.py`)
+- Implemented level-aware MCP responses with `status: partial`, `available_level`, `requested_level`, and upgrade hints
 - Implemented scoped regeneration for `regenerate(scope)` and scoped CLI upgrades via `upgrade --pou`
-- Implemented `as-docs diff`, `as-docs install-hook`, and `as-docs watch` for Phase 4 git integration
-- `as-docs watch` now batches file events and regenerates once after the debounce window settles
+- Implemented `as-docs diff`, `as-docs install-hook`, and `as-docs watch` for git integration
+- `as-docs watch` batches file events and regenerates once after debounce window
 - Implemented Phase 5 template integration for `as-docs` MCP and GitHub Copilot assets
-- Implemented Level 4 flow-diagram pipeline with parser-first extraction, Mermaid output, and AI narrative fallback
-- Implemented the standalone packaging plan and build helper for a PyInstaller-based `as-docs-server` executable
+- Implemented Level 4 flow-diagram pipeline with parser-first extraction and AI narrative fallback
+- Implemented standalone packaging plan and build helper for PyInstaller-based `as-docs-server` executable
+
+**Total: 173 tests passing** (11 CLI + 162 existing)
 
 See `EXECUTION_CHECKLIST.md` for the live prioritized execution tracker.
 
