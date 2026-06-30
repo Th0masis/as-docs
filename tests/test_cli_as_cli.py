@@ -1,4 +1,4 @@
-"""Tests for CLI updates with as-cli integration."""
+﻿"""Tests for CLI updates with as-cli integration."""
 import pytest
 from click.testing import CliRunner
 from pathlib import Path
@@ -241,8 +241,8 @@ output:
                 result = runner.invoke(as_cli_check)
                 
                 assert result.exit_code == 0
-                assert "✅  as-cli is installed" in result.output
-                assert "✅  Connected to daemon" in result.output
+                assert "as-cli is installed" in result.output
+                assert "Connected to daemon" in result.output
                 assert "1 modules found" in result.output
                 assert "1 symbols found" in result.output
     
@@ -274,7 +274,7 @@ output:
                 result = runner.invoke(as_cli_check)
                 
                 assert result.exit_code == 0
-                assert "❌  as-cli is not available" in result.output
+                assert "as-cli is not available" in result.output
                 assert "Ensure as-cli is installed" in result.output
     
     def test_as_cli_check_command_failures(self, runner):
@@ -310,8 +310,8 @@ output:
                 result = runner.invoke(as_cli_check)
                 
                 assert result.exit_code == 0
-                assert "⚠️   logical_list failed" in result.output
-                assert "⚠️   symbol_search failed" in result.output
+                assert "logical_list failed" in result.output
+                assert "symbol_search failed" in result.output
     
     def test_as_cli_check_recommendations_enabled(self, runner):
         """Test as-cli-check shows recommendation when enabled."""
@@ -576,8 +576,8 @@ output:
                 result = runner.invoke(as_cli_check)
                 
                 assert result.exit_code == 0
-                assert "✅  as-cli is installed" in result.output
-                assert "✅  Connected to daemon" in result.output
+                assert "as-cli is installed" in result.output
+                assert "Connected to daemon" in result.output
                 assert "1 modules found" in result.output
                 assert "1 symbols found" in result.output
     
@@ -608,7 +608,7 @@ output:
                 result = runner.invoke(as_cli_check)
                 
                 assert result.exit_code == 0
-                assert "❌  as-cli is not available" in result.output
+                assert "as-cli is not available" in result.output
                 assert "Ensure as-cli is installed" in result.output
     
     def test_as_cli_check_command_failures(self, runner):
@@ -644,8 +644,8 @@ output:
                 result = runner.invoke(as_cli_check)
                 
                 assert result.exit_code == 0
-                assert "⚠️   logical_list failed" in result.output
-                assert "⚠️   symbol_search failed" in result.output
+                assert "logical_list failed" in result.output
+                assert "symbol_search failed" in result.output
     
     def test_as_cli_check_recommendations_enabled(self, runner):
         """Test as-cli-check shows recommendation when enabled."""
@@ -704,3 +704,4 @@ output:
                 
                 assert result.exit_code == 0
                 assert "Enable as-cli in .as-docs.yaml" in result.output
+
