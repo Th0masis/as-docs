@@ -76,6 +76,175 @@ as-docs status
 # max_recursion_depth: 5          (reduce depth limit)
 ```
 
+## Commands
+
+All `as-docs` functionality is accessed via the CLI. Use `as-docs --help` for a full command list, or `as-docs <command> --help` for detailed options.
+
+### `as-docs init`
+Initialize a new as-docs project.
+```bash
+as-docs init                # Create .as-docs.yaml in project root
+as-docs init --mcp          # Also configure MCP support in .vscode/mcp.json
+as-docs init --http         # Configure HTTP transport for MCP (default: stdio)
+```
+
+**What it does:**
+- Detects the AS project root (looks for `Logical/` and `Physical/` directories)
+- Creates `.as-docs.yaml` with default configuration
+- Updates `.gitignore` to exclude cache and generated documentation
+- Optionally configures VS Code MCP integration
+
+---
+
+### `as-docs generate`
+Generate documentation for the AS project.
+```bash
+as-docs generate                              # Generate with default level (from config)
+as-docs generate --level 1                    # Level 1 (project map, no AI)
+as-docs generate --level 3                    # Level 3 (with AI enrichment)
+as-docs generate --no-ai                      # Force Level 1 (skip AI)
+as-docs generate --use-as-cli                 # Enable as-cli integration
+as-docs generate --scope changed              # Regenerate only changed POUs
+as-docs generate --scope pou:MainProgram      # Regenerate a single POU
+```
+
+**Options:**
+- `--level N` — Documentation level (1–4). Default from config (usually 3)
+- `--no-ai` — Skip AI enrichment (force Level 1)
+- `--use-as-cli` — Enable as-cli integration (if available)
+- `--scope all|changed|pou:<name>` — Regeneration scope (default: all)
+- `--config <path>` — Path to .as-docs.yaml (auto-detected by default)
+
+**Documentation Levels:**
+- **Level 1:** Project structure (tasks, POUs, variables, call graphs) — instant, no AI calls
+- **Level 2:** Task descriptions and responsibilities — AI enrichment for tasks
+- **Level 3:** POU descriptions, patterns, and notes — full AI enrichment
+- **Level 4:** Behavioral flow diagrams (Mermaid) — AI-assisted diagram generation
+
+---
+
+### `as-docs status`
+Show documentation freshness and POU inventory.
+```bash
+as-docs status              # List all POUs with freshness state
+```
+
+**Output states:**
+- `fresh` — Source code matches documented version
+- `stale` (!) — Source code has changed since documentation was generated
+- `missing` (?) — Documentation not yet generated
+
+Use this to identify which POUs need regeneration.
+
+---
+
+### `as-docs upgrade`
+Upgrade documentation to a higher level.
+```bash
+as-docs upgrade --to 2                        # Upgrade all POUs to Level 2
+as-docs upgrade --to 3 --pou MainProgram      # Upgrade one POU to Level 3
+```
+
+**Options:**
+- `--to N` — Target level (2, 3, or 4)
+- `--pou <name>` — Optional: upgrade only this POU (default: all)
+
+Useful for incrementally enriching documentation with AI.
+
+---
+
+### `as-docs cache clear`
+Clear cached AI responses.
+```bash
+as-docs cache clear                    # Clear entire cache
+as-docs cache clear --pou MainProgram  # Clear cache for one POU
+```
+
+Use after updating AI provider/model settings or to force re-enrichment.
+
+---
+
+### `as-docs serve`
+Start the MCP (Model Context Protocol) server.
+```bash
+as-docs serve                  # Start on stdio (default)
+as-docs serve --http           # Start on HTTP (port 8765)
+as-docs serve --http --port 9000
+```
+
+**Use with:**
+- VS Code Copilot Chat (configure via `.vscode/mcp.json` or `--mcp` flag)
+- Claude Desktop or other AI clients
+- Custom MCP applications
+
+---
+
+### `as-docs watch`
+Watch for source changes and regenerate automatically.
+```bash
+as-docs watch                   # Watch Level 1 docs (default)
+as-docs watch --level 2         # Watch with AI enrichment
+as-docs watch --debounce-ms 1000
+```
+
+**Options:**
+- `--level N` — Documentation level to maintain (default: 1)
+- `--debounce-ms MS` — Wait time before regenerating after file change (default: 500)
+
+Runs as a daemon. Press `Ctrl+C` to stop. Useful during development.
+
+---
+
+### `as-docs diff`
+Show which POUs changed since a git reference.
+```bash
+as-docs diff                         # Changes since HEAD~1
+as-docs diff HEAD~2                  # Changes since 2 commits ago
+as-docs diff main                    # Changes since main branch
+```
+
+**Output:**
+- List of changed files
+- List of affected POUs
+- Suggested commands to upgrade just those POUs
+
+Useful for CI/CD and selective documentation updates.
+
+---
+
+### `as-docs install-hook`
+Install a git post-commit hook for automatic documentation regeneration.
+```bash
+as-docs install-hook            # Install with confirmation
+as-docs install-hook --yes      # Install without prompt
+as-docs install-hook --force    # Replace any existing hook
+```
+
+**What it does:**
+- Installs a `.git/hooks/post-commit` script
+- Automatically regenerates documentation after each commit
+- Level is determined by `git.auto_level` in config (default: 2)
+- Gracefully skips if as-docs is not available
+
+---
+
+### `as-docs as-cli-check`
+Diagnose as-cli integration status.
+```bash
+as-docs as-cli-check
+```
+
+**Checks:**
+1. Configuration display
+2. as-cli availability (installed, in PATH)
+3. Daemon connectivity
+4. Command availability (logical_list, symbol_search)
+5. Configuration recommendations
+
+Use when troubleshooting as-cli integration issues.
+
+---
+
 ## as-cli Integration
 
 **Automation Studio Project Discovery via as-cli**
