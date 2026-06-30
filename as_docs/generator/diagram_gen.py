@@ -1,4 +1,5 @@
 """Mermaid structural diagram generator."""
+
 from __future__ import annotations
 import re
 from as_docs.model.graph import KnowledgeGraph
@@ -80,7 +81,7 @@ def generate_data_flow_diagram(graph: KnowledgeGraph) -> str:
     task_names = list(graph.tasks.keys())
 
     for i, task_a in enumerate(task_names):
-        for task_b in task_names[i + 1:]:
+        for task_b in task_names[i + 1 :]:
             pous_a = task_programs.get(task_a, set())
             pous_b = task_programs.get(task_b, set())
             shared = _shared_vars(pous_a, pous_b, xrefs)
@@ -89,8 +90,10 @@ def generate_data_flow_diagram(graph: KnowledgeGraph) -> str:
                 safe_b = _safe_id(task_b)
                 label = ", ".join(sorted(shared)[:3])
                 if len(shared) > 3:
-                    label += f" +{len(shared)-3}"
-                lines.append(f'    {safe_a}["{task_a}"] -- "{label}" --> {safe_b}["{task_b}"]')
+                    label += f" +{len(shared) - 3}"
+                lines.append(
+                    f'    {safe_a}["{task_a}"] -- "{label}" --> {safe_b}["{task_b}"]'
+                )
 
     if len(lines) == 1:
         lines.append("    note[No cross-task variable sharing detected]")

@@ -1,4 +1,5 @@
 """Project scanner — walks the AS project directory tree and discovers files."""
+
 from __future__ import annotations
 import logging
 from pathlib import Path
@@ -54,6 +55,7 @@ def scan_project(config: Config, project_root: Path | None = None) -> ProjectMod
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _resolve_root(config: Config) -> Path:
     root = Path(config.project.root).resolve()
@@ -138,7 +140,11 @@ def _scan_logical(
             parent_name = path.parent.name
             matched_name = parent_name if parent_name in model.pous else pou_name
             model.st_files.append(
-                RawSTFile(path=path, pou_name=matched_name, source=path.read_text(encoding="utf-8", errors="replace"))
+                RawSTFile(
+                    path=path,
+                    pou_name=matched_name,
+                    source=path.read_text(encoding="utf-8", errors="replace"),
+                )
             )
 
 

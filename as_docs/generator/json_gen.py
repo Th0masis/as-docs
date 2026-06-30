@@ -1,4 +1,5 @@
 """JSON generator — serializes KnowledgeGraph to knowledge_graph.json."""
+
 from __future__ import annotations
 import dataclasses
 import json
@@ -38,5 +39,7 @@ def generate_json(graph: KnowledgeGraph, output_dir: Path) -> Path:
         "flow_diagrams": {k: to_dict(v) for k, v in graph.flow_diagrams.items()},
     }
 
-    out_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    out_path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     return out_path

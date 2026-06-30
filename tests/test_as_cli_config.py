@@ -1,4 +1,5 @@
 """Tests for as-cli configuration loading and validation."""
+
 import pytest
 from as_docs.config import (
     Config,

@@ -38,7 +38,9 @@ class AnthropicProvider:
             kwargs["base_url"] = ai_config.api_base_url.strip()
         self._client = Anthropic(**kwargs)
 
-    def enrich_task(self, prompt: str, model: str, max_tokens: int) -> EnrichmentPayload:
+    def enrich_task(
+        self, prompt: str, model: str, max_tokens: int
+    ) -> EnrichmentPayload:
         return self._request(prompt=prompt, model=model, max_tokens=max_tokens)
 
     def enrich_pou(self, prompt: str, model: str, max_tokens: int) -> EnrichmentPayload:
@@ -62,10 +64,14 @@ class AnthropicProvider:
                 parsed = json.loads(raw_json)
                 return _normalize_payload(parsed)
             except json.JSONDecodeError as exc:
-                raise RuntimeError(f"Anthropic provider returned invalid JSON: {exc}") from exc
+                raise RuntimeError(
+                    f"Anthropic provider returned invalid JSON: {exc}"
+                ) from exc
             except Exception as exc:
                 if attempt >= max_attempts:
-                    raise RuntimeError(f"Anthropic provider request failed: {exc}") from exc
+                    raise RuntimeError(
+                        f"Anthropic provider request failed: {exc}"
+                    ) from exc
                 time.sleep(0.4 * attempt)
 
         raise RuntimeError("Anthropic provider request failed after retries.")
@@ -95,18 +101,24 @@ def _extract_json_block(text: str) -> str:
     start = text.find("{")
     end = text.rfind("}")
     if start < 0 or end < 0 or end <= start:
-        raise RuntimeError("Anthropic provider response does not contain a JSON object.")
+        raise RuntimeError(
+            "Anthropic provider response does not contain a JSON object."
+        )
     return text[start : end + 1]
 
 
 def _normalize_payload(data: dict[str, Any]) -> EnrichmentPayload:
     desc = str(data.get("description", "")).strip()
     if not desc:
-        raise RuntimeError("Anthropic provider response is missing non-empty 'description'.")
+        raise RuntimeError(
+            "Anthropic provider response is missing non-empty 'description'."
+        )
 
     responsibilities = data.get("responsibilities", [])
     if not isinstance(responsibilities, list):
-        raise RuntimeError("Anthropic provider response field 'responsibilities' must be an array.")
+        raise RuntimeError(
+            "Anthropic provider response field 'responsibilities' must be an array."
+        )
 
     patterns = data.get("patterns", [])
     if not isinstance(patterns, list):
@@ -116,7 +128,9 @@ def _normalize_payload(data: dict[str, Any]) -> EnrichmentPayload:
 
     return EnrichmentPayload(
         description=desc,
-        responsibilities=[str(item).strip() for item in responsibilities if str(item).strip()],
+        responsibilities=[
+            str(item).strip() for item in responsibilities if str(item).strip()
+        ],
         patterns=[str(item).strip() for item in patterns if str(item).strip()],
         notes=notes,
     )

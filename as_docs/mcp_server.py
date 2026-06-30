@@ -50,7 +50,9 @@ def _load_graph_required(config: Config) -> KnowledgeGraph:
 
 
 def _task_program_map(graph: KnowledgeGraph) -> dict[str, set[str]]:
-    mapping: dict[str, set[str]] = {name: set(task.programs) for name, task in graph.tasks.items()}
+    mapping: dict[str, set[str]] = {
+        name: set(task.programs) for name, task in graph.tasks.items()
+    }
     for edge in graph.edges:
         if edge.edge_type == "OWNS":
             mapping.setdefault(edge.source, set()).add(edge.target)
@@ -88,19 +90,27 @@ def get_task_payload(
 ) -> dict[str, Any]:
     task = graph.tasks.get(name)
     if task is None:
-        return {"status": "not_found", **_meta(graph), "message": f"Unknown task: {name}"}
+        return {
+            "status": "not_found",
+            **_meta(graph),
+            "message": f"Unknown task: {name}",
+        }
 
     programs = set(task.programs)
     closure = _task_closure(graph, programs)
     reads = sorted(
         e.target
         for e in graph.edges
-        if e.edge_type == "READS" and e.source in closure and e.target in graph.global_vars
+        if e.edge_type == "READS"
+        and e.source in closure
+        and e.target in graph.global_vars
     )
     writes = sorted(
         e.target
         for e in graph.edges
-        if e.edge_type == "WRITES" and e.source in closure and e.target in graph.global_vars
+        if e.edge_type == "WRITES"
+        and e.source in closure
+        and e.target in graph.global_vars
     )
 
     data = {
@@ -166,7 +176,11 @@ def get_pou_payload(
 ) -> dict[str, Any]:
     pou = graph.pous.get(name)
     if pou is None:
-        return {"status": "not_found", **_meta(graph), "message": f"Unknown POU: {name}"}
+        return {
+            "status": "not_found",
+            **_meta(graph),
+            "message": f"Unknown POU: {name}",
+        }
 
     callers = sorted(
         e.source for e in graph.edges if e.edge_type == "CALLS" and e.target == name
@@ -182,7 +196,9 @@ def get_pou_payload(
     writes = sorted(
         e.target
         for e in graph.edges
-        if e.edge_type == "WRITES" and e.source == name and e.target in graph.global_vars
+        if e.edge_type == "WRITES"
+        and e.source == name
+        and e.target in graph.global_vars
     )
 
     data = {
@@ -212,7 +228,11 @@ def get_pou_payload(
 def find_variable_payload(graph: KnowledgeGraph, name: str) -> dict[str, Any]:
     var = graph.global_vars.get(name)
     if var is None:
-        return {"status": "not_found", **_meta(graph), "message": f"Unknown variable: {name}"}
+        return {
+            "status": "not_found",
+            **_meta(graph),
+            "message": f"Unknown variable: {name}",
+        }
 
     readers = sorted(
         {e.source for e in graph.edges if e.edge_type == "READS" and e.target == name}
@@ -237,7 +257,9 @@ def find_variable_payload(graph: KnowledgeGraph, name: str) -> dict[str, Any]:
     }
 
 
-def get_global_vars_payload(graph: KnowledgeGraph, gvl: str | None = None) -> dict[str, Any]:
+def get_global_vars_payload(
+    graph: KnowledgeGraph, gvl: str | None = None
+) -> dict[str, Any]:
     items: dict[str, list[dict[str, Any]]] = {}
     for var in graph.global_vars.values():
         group = var.gvl_name or "(ungrouped)"
@@ -258,7 +280,9 @@ def get_global_vars_payload(graph: KnowledgeGraph, gvl: str | None = None) -> di
     }
 
 
-def get_call_graph_payload(graph: KnowledgeGraph, root: str | None = None) -> dict[str, Any]:
+def get_call_graph_payload(
+    graph: KnowledgeGraph, root: str | None = None
+) -> dict[str, Any]:
     calls = [(e.source, e.target) for e in graph.edges if e.edge_type == "CALLS"]
     adjacency: dict[str, list[str]] = {}
     for src, tgt in calls:
@@ -294,7 +318,9 @@ def get_call_graph_payload(graph: KnowledgeGraph, root: str | None = None) -> di
     }
 
 
-def get_data_flow_payload(graph: KnowledgeGraph, requested_level: int = 2) -> dict[str, Any]:
+def get_data_flow_payload(
+    graph: KnowledgeGraph, requested_level: int = 2
+) -> dict[str, Any]:
     task_programs = _task_program_map(graph)
     task_closures = {
         task_name: _task_closure(graph, programs)
@@ -317,8 +343,14 @@ def get_data_flow_payload(graph: KnowledgeGraph, requested_level: int = 2) -> di
             closure_a = task_closures.get(task_a, set())
             closure_b = task_closures.get(task_b, set())
             for var_name in graph.global_vars:
-                touched_a = bool((readers.get(var_name, set()) | writers.get(var_name, set())) & closure_a)
-                touched_b = bool((readers.get(var_name, set()) | writers.get(var_name, set())) & closure_b)
+                touched_a = bool(
+                    (readers.get(var_name, set()) | writers.get(var_name, set()))
+                    & closure_a
+                )
+                touched_b = bool(
+                    (readers.get(var_name, set()) | writers.get(var_name, set()))
+                    & closure_b
+                )
                 if touched_a and touched_b:
                     shared.add(var_name)
             if shared:
@@ -342,7 +374,9 @@ def get_data_flow_payload(graph: KnowledgeGraph, requested_level: int = 2) -> di
     )
 
 
-def get_flow_diagram_payload(graph: KnowledgeGraph, name: str, requested_level: int = 4) -> dict[str, Any]:
+def get_flow_diagram_payload(
+    graph: KnowledgeGraph, name: str, requested_level: int = 4
+) -> dict[str, Any]:
     diagram = graph.flow_diagrams.get(name)
     if diagram is None:
         response = _partial_or_ok(
@@ -425,7 +459,9 @@ def regenerate_payload(config: Config, scope: str = "all") -> dict[str, Any]:
     }
 
     if meta.get("fallback_full"):
-        response["warning"] = "No prior graph found for scoped operation; executed a full baseline regeneration."
+        response["warning"] = (
+            "No prior graph found for scoped operation; executed a full baseline regeneration."
+        )
 
     return response
 
@@ -457,7 +493,9 @@ def get_cache_status_payload(config: Config) -> dict[str, Any]:
     }
 
 
-def upgrade_payload(config: Config, to_level: int, pou: str | None = None) -> dict[str, Any]:
+def upgrade_payload(
+    config: Config, to_level: int, pou: str | None = None
+) -> dict[str, Any]:
     if to_level < 1 or to_level > 4:
         raise ValueError("Target level must be between 1 and 4.")
 
@@ -479,7 +517,9 @@ def upgrade_payload(config: Config, to_level: int, pou: str | None = None) -> di
     }
 
     if meta.get("fallback_full"):
-        response["warning"] = "No prior graph found for scoped upgrade; executed a full baseline regeneration."
+        response["warning"] = (
+            "No prior graph found for scoped upgrade; executed a full baseline regeneration."
+        )
 
     return response
 
@@ -613,7 +653,9 @@ def start_server(config: Config, use_http: bool = False, port: int = 8765) -> No
     def get_flow_diagram(name: str, requested_level: int = 4) -> dict[str, Any]:
         """Return Level 4 flow diagram for a POU when available."""
 
-        return get_flow_diagram_payload(_graph(), name=name, requested_level=requested_level)
+        return get_flow_diagram_payload(
+            _graph(), name=name, requested_level=requested_level
+        )
 
     def regenerate(scope: str = "all") -> dict[str, Any]:
         """Regenerate docs for all/changed/single-POU scope."""
@@ -631,16 +673,36 @@ def start_server(config: Config, use_http: bool = False, port: int = 8765) -> No
         return upgrade_payload(config, to_level=to_level, pou=pou)
 
     tool_specs = [
-        (get_overview, "get_overview", "Return project summary and generation metadata."),
+        (
+            get_overview,
+            "get_overview",
+            "Return project summary and generation metadata.",
+        ),
         (get_pou_list, "get_pou_list", "Return all POUs with basic metadata."),
         (get_task, "get_task", "Return full task documentation."),
         (get_pou, "get_pou", "Return full POU documentation."),
-        (find_variable, "find_variable", "Find all readers/writers of a global variable."),
-        (get_data_flow, "get_data_flow", "Return cross-task coupling data and diagram."),
-        (get_call_graph, "get_call_graph", "Return call hierarchy from root or whole project."),
+        (
+            find_variable,
+            "find_variable",
+            "Find all readers/writers of a global variable.",
+        ),
+        (
+            get_data_flow,
+            "get_data_flow",
+            "Return cross-task coupling data and diagram.",
+        ),
+        (
+            get_call_graph,
+            "get_call_graph",
+            "Return call hierarchy from root or whole project.",
+        ),
         (get_global_vars, "get_global_vars", "Return global variables grouped by GVL."),
         (search, "search", "Text search across knowledge graph entities."),
-        (get_flow_diagram, "get_flow_diagram", "Return Level 4 flow diagram for a POU."),
+        (
+            get_flow_diagram,
+            "get_flow_diagram",
+            "Return Level 4 flow diagram for a POU.",
+        ),
         (regenerate, "regenerate", "Regenerate docs for all/changed/single-POU scope."),
         (get_cache_status, "get_cache_status", "Return cache freshness per POU."),
         (upgrade, "upgrade", "Upgrade docs to a higher level."),

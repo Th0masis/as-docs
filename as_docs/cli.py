@@ -1,4 +1,5 @@
 """Click CLI entry points for as-docs."""
+
 from __future__ import annotations
 import json
 import logging
@@ -17,7 +18,14 @@ from as_docs.scanner.as_cli_adapter import AsCliAdapter, AsCliError
 
 @click.group()
 @click.version_option()
-@click.option("-v", "--verbose", is_flag=True, default=False, help="Enable DEBUG logging.", envvar="AS_DOCS_VERBOSE")
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    default=False,
+    help="Enable DEBUG logging.",
+    envvar="AS_DOCS_VERBOSE",
+)
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool) -> None:
     """as-docs — Documentation generator for B&R Automation Studio projects."""
@@ -34,9 +42,14 @@ def cli(ctx: click.Context, verbose: bool) -> None:
 # as-docs init
 # ---------------------------------------------------------------------------
 
+
 @cli.command()
 @click.option("--http", is_flag=True, help="Configure for HTTP MCP transport.")
-@click.option("--mcp", is_flag=True, help="Create or update .vscode/mcp.json with an as-docs server entry.")
+@click.option(
+    "--mcp",
+    is_flag=True,
+    help="Create or update .vscode/mcp.json with an as-docs server entry.",
+)
 def init(http: bool, mcp: bool) -> None:
     """Detect AS project root, create .as-docs.yaml, update .gitignore."""
     root = find_project_root()
@@ -87,7 +100,9 @@ def _update_gitignore(root: Path) -> None:
     additions = [e for e in entries if e not in content]
     if additions:
         sep = "\n" if content and not content.endswith("\n") else ""
-        gitignore.write_text(content + sep + "\n".join(additions) + "\n", encoding="utf-8")
+        gitignore.write_text(
+            content + sep + "\n".join(additions) + "\n", encoding="utf-8"
+        )
 
 
 def _update_vscode_mcp(root: Path) -> Path:
@@ -96,7 +111,11 @@ def _update_vscode_mcp(root: Path) -> Path:
     mcp_file = vscode_dir / "mcp.json"
 
     try:
-        payload = json.loads(mcp_file.read_text(encoding="utf-8")) if mcp_file.exists() else {}
+        payload = (
+            json.loads(mcp_file.read_text(encoding="utf-8"))
+            if mcp_file.exists()
+            else {}
+        )
     except json.JSONDecodeError as exc:
         raise click.ClickException(f"Invalid JSON in {mcp_file}: {exc}") from exc
 
@@ -164,19 +183,50 @@ git:
 # as-docs generate
 # ---------------------------------------------------------------------------
 
+
 @cli.command()
-@click.option("--level", default=None, type=int, help="Documentation level (1–4). Default from config.")
-@click.option("--no-ai", "no_ai", is_flag=True, help="Skip AI enrichment (Level 1 only).")
-@click.option("--use-as-cli", "use_as_cli", is_flag=True, help="Enable as-cli integration (if available). Overrides config.")
-@click.option("--scope", default="all", type=str, help="Regeneration scope: all, changed, or pou:<name>.")
-@click.option("--config", "config_path", default=None, type=click.Path(), help="Path to .as-docs.yaml")
+@click.option(
+    "--level",
+    default=None,
+    type=int,
+    help="Documentation level (1–4). Default from config.",
+)
+@click.option(
+    "--no-ai", "no_ai", is_flag=True, help="Skip AI enrichment (Level 1 only)."
+)
+@click.option(
+    "--use-as-cli",
+    "use_as_cli",
+    is_flag=True,
+    help="Enable as-cli integration (if available). Overrides config.",
+)
+@click.option(
+    "--scope",
+    default="all",
+    type=str,
+    help="Regeneration scope: all, changed, or pou:<name>.",
+)
+@click.option(
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(),
+    help="Path to .as-docs.yaml",
+)
 @click.pass_context
-def generate(ctx: click.Context, level: int | None, no_ai: bool, use_as_cli: bool, scope: str, config_path: str | None) -> None:
+def generate(
+    ctx: click.Context,
+    level: int | None,
+    no_ai: bool,
+    use_as_cli: bool,
+    scope: str,
+    config_path: str | None,
+) -> None:
     """Generate documentation for the AS project.
-    
+
     By default, uses filesystem scanner. With --use-as-cli, attempts to merge
     as-cli data (if available). Falls back to filesystem if as-cli unavailable.
-    
+
     Scoping:
       --scope all         Regenerate all POUs (default)
       --scope changed     Regenerate only POUs with changed source files
@@ -185,10 +235,14 @@ def generate(ctx: click.Context, level: int | None, no_ai: bool, use_as_cli: boo
     from as_docs.engine import run_generate
 
     cfg = _load_cfg(config_path)
-    effective_level = level if level is not None else (1 if no_ai else cfg.output.default_level)
+    effective_level = (
+        level if level is not None else (1 if no_ai else cfg.output.default_level)
+    )
     ai_enabled = cfg.ai.enabled and not no_ai and effective_level >= 2
 
-    click.echo(f"Generating Level {effective_level} docs for '{cfg.project.name or 'project'}'...")
+    click.echo(
+        f"Generating Level {effective_level} docs for '{cfg.project.name or 'project'}'..."
+    )
     if ai_enabled:
         click.echo(
             f"AI enrichment enabled (provider: {cfg.ai.provider}, model: {cfg.ai.model})"
@@ -199,7 +253,13 @@ def generate(ctx: click.Context, level: int | None, no_ai: bool, use_as_cli: boo
         click.echo(f"Scope: {scope}")
 
     try:
-        graph = run_generate(cfg, level=effective_level, ai_enabled=ai_enabled, use_as_cli=use_as_cli, scope=scope)
+        graph = run_generate(
+            cfg,
+            level=effective_level,
+            ai_enabled=ai_enabled,
+            use_as_cli=use_as_cli,
+            scope=scope,
+        )
         out = Path(cfg.output.docs_dir)
         click.echo(f"\nDone — {len(graph.pous)} POUs, {len(graph.tasks)} tasks")
         if ai_enabled:
@@ -208,7 +268,7 @@ def generate(ctx: click.Context, level: int | None, no_ai: bool, use_as_cli: boo
                 click.echo(
                     f"AI cache: hits={stats.hits}, misses={stats.misses}, writes={stats.writes}"
                 )
-        
+
         # Show as-cli merge report if available
         meta = getattr(graph, "_regen_meta", {})
         as_cli_report = meta.get("as_cli_merge_report")
@@ -217,14 +277,20 @@ def generate(ctx: click.Context, level: int | None, no_ai: bool, use_as_cli: boo
             click.echo(f"    Filesystem: {as_cli_report['pou_count_fs']} POUs")
             click.echo(f"    as-cli: {as_cli_report['pou_count_as_cli']} POUs")
             click.echo(f"    Merged: {as_cli_report['pou_count_merged']} POUs")
-            if as_cli_report['conflicts']:
+            if as_cli_report["conflicts"]:
                 click.echo(f"    Conflicts: {len(as_cli_report['conflicts'])}")
-                for conflict in as_cli_report['conflicts'][:3]:
-                    click.echo(f"       - {conflict['pou_name']}: {conflict['conflict_type']}")
-                if len(as_cli_report['conflicts']) > 3:
-                    click.echo(f"       ... and {len(as_cli_report['conflicts']) - 3} more")
-            click.echo(f"    Full report: {out.resolve() / 'as_cli_conflict_report.json'}")
-        
+                for conflict in as_cli_report["conflicts"][:3]:
+                    click.echo(
+                        f"       - {conflict['pou_name']}: {conflict['conflict_type']}"
+                    )
+                if len(as_cli_report["conflicts"]) > 3:
+                    click.echo(
+                        f"       ... and {len(as_cli_report['conflicts']) - 3} more"
+                    )
+            click.echo(
+                f"    Full report: {out.resolve() / 'as_cli_conflict_report.json'}"
+            )
+
         click.echo(f"Output: {out.resolve()}")
     except FileNotFoundError as e:
         click.echo(f"ERROR: {e}", err=True)
@@ -238,18 +304,25 @@ def generate(ctx: click.Context, level: int | None, no_ai: bool, use_as_cli: boo
 # as-docs as-cli-check
 # ---------------------------------------------------------------------------
 
+
 @cli.command("as-cli-check")
-@click.option("--config", "config_path", default=None, type=click.Path(), help="Path to .as-docs.yaml")
+@click.option(
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(),
+    help="Path to .as-docs.yaml",
+)
 def as_cli_check(config_path: str | None) -> None:
     """Diagnose as-cli integration and availability.
-    
+
     Checks if as-cli is installed, accessible, and can communicate with an
     Automation Studio project. Useful for troubleshooting integration issues.
     """
     cfg = _load_cfg(config_path)
-    
+
     click.echo(" Diagnosing as-cli integration...\n")
-    
+
     # Step 1: Check configuration
     click.echo("1.  Configuration:")
     click.echo(f"    Enabled: {cfg.as_cli.enabled}")
@@ -258,14 +331,14 @@ def as_cli_check(config_path: str | None) -> None:
     click.echo(f"    Strict mode: {cfg.as_cli.strict}")
     click.echo(f"    Commands: {', '.join(cfg.as_cli.use_commands)}")
     click.echo()
-    
+
     # Step 2: Check availability
     click.echo("2.  Availability check:")
     adapter = AsCliAdapter(
         as_cli_path=cfg.as_cli.path,
-        timeout_ms=2000  # Quick check timeout
+        timeout_ms=2000,  # Quick check timeout
     )
-    
+
     as_cli_available = False
     try:
         if adapter.is_available():
@@ -279,9 +352,9 @@ def as_cli_check(config_path: str | None) -> None:
             click.echo("    - Try: as-cli --version")
     except Exception as e:
         click.echo(f"    Error checking availability: {e}")
-    
+
     click.echo()
-    
+
     # Only proceed to steps 3-4 if as-cli is available
     if as_cli_available:
         # Step 3: Try to connect to daemon or start one
@@ -293,12 +366,12 @@ def as_cli_check(config_path: str | None) -> None:
         except Exception as e:
             click.echo(f"    Daemon issue: {e}")
             click.echo("    Note: This may be temporary; retry later")
-        
+
         click.echo()
-        
+
         # Step 4: Try basic commands
         click.echo("4.  Command availability:")
-        
+
         try:
             # Try logical_list
             if "logical_list" in cfg.as_cli.use_commands:
@@ -308,7 +381,7 @@ def as_cli_check(config_path: str | None) -> None:
                     click.echo(f"    logical_list: {len(modules)} modules found")
                 except AsCliError as e:
                     click.echo(f"    logical_list failed: {e}")
-            
+
             # Try symbol_search
             if "symbol_search" in cfg.as_cli.use_commands:
                 try:
@@ -319,21 +392,21 @@ def as_cli_check(config_path: str | None) -> None:
                     click.echo(f"    symbol_search failed: {e}")
         except Exception as e:
             click.echo(f"    Error running commands: {e}")
-        
+
         click.echo()
-    
+
     # Step 5: Configuration recommendations
     click.echo("5.  Recommendations:")
     if not cfg.as_cli.enabled:
         click.echo("    • Enable as-cli in .as-docs.yaml: as_cli.enabled: true")
     else:
         click.echo("    • as-cli is enabled in config ")
-    
+
     if cfg.as_cli.strict:
         click.echo("    • Running in strict mode (will fail if as-cli unavailable)")
     else:
         click.echo("    • Running in graceful fallback mode (recommended)")
-    
+
     click.echo()
     click.echo("Diagnostic complete.")
 
@@ -342,8 +415,11 @@ def as_cli_check(config_path: str | None) -> None:
 # as-docs upgrade
 # ---------------------------------------------------------------------------
 
+
 @cli.command()
-@click.option("--to", "to_level", required=True, type=int, help="Target level (2, 3, or 4).")
+@click.option(
+    "--to", "to_level", required=True, type=int, help="Target level (2, 3, or 4)."
+)
 @click.option("--pou", default=None, help="Upgrade a single POU by name.")
 @click.option("--config", "config_path", default=None, type=click.Path())
 def upgrade(to_level: int, pou: str | None, config_path: str | None) -> None:
@@ -368,7 +444,9 @@ def upgrade(to_level: int, pou: str | None, config_path: str | None) -> None:
         click.echo(f"Touched POUs: {touched}")
         click.echo(f"  Elapsed: {meta.get('elapsed_seconds', 0.0)}s")
         if meta.get("fallback_full"):
-            click.echo("No prior graph found; executed full regeneration to establish baseline.")
+            click.echo(
+                "No prior graph found; executed full regeneration to establish baseline."
+            )
     except ValueError as e:
         click.echo(f"ERROR: {e}", err=True)
         sys.exit(1)
@@ -383,6 +461,7 @@ def upgrade(to_level: int, pou: str | None, config_path: str | None) -> None:
 # ---------------------------------------------------------------------------
 # as-docs status
 # ---------------------------------------------------------------------------
+
 
 @cli.command()
 @click.option("--config", "config_path", default=None, type=click.Path())
@@ -415,6 +494,7 @@ def status(config_path: str | None) -> None:
 # as-docs cache
 # ---------------------------------------------------------------------------
 
+
 @cli.group()
 def cache() -> None:
     """Manage the AI response cache."""
@@ -438,6 +518,7 @@ def cache_clear(pou: str | None, config_path: str | None) -> None:
         click.echo(f"Cleared {cleared} cache file(s) for '{pou}'.")
     else:
         import shutil
+
         shutil.rmtree(cache_dir)
         click.echo("Cache cleared.")
 
@@ -445,6 +526,7 @@ def cache_clear(pou: str | None, config_path: str | None) -> None:
 # ---------------------------------------------------------------------------
 # as-docs serve
 # ---------------------------------------------------------------------------
+
 
 @cli.command()
 @click.option("--http", is_flag=True, help="Use HTTP transport instead of stdio.")
@@ -455,7 +537,10 @@ def serve(http: bool, port: int, config_path: str | None) -> None:
     try:
         from as_docs.mcp_server import start_server
     except ImportError:
-        click.echo("ERROR: MCP server dependencies not installed. Install with: pip install as-docs[mcp]", err=True)
+        click.echo(
+            "ERROR: MCP server dependencies not installed. Install with: pip install as-docs[mcp]",
+            err=True,
+        )
         sys.exit(1)
     cfg = _load_cfg(config_path)
     start_server(cfg, use_http=http, port=port)
@@ -464,6 +549,7 @@ def serve(http: bool, port: int, config_path: str | None) -> None:
 # ---------------------------------------------------------------------------
 # as-docs watch
 # ---------------------------------------------------------------------------
+
 
 @cli.command()
 @click.option("--level", default=1, show_default=True, type=int)
@@ -513,13 +599,17 @@ def watch(level: int, debounce_ms: int, config_path: str | None) -> None:
     observer.start()
     try:
         while True:
-            if (pending_pous or pending_generic_change) and (time.monotonic() - last_event_at) >= debounce_seconds:
+            if (pending_pous or pending_generic_change) and (
+                time.monotonic() - last_event_at
+            ) >= debounce_seconds:
                 scope = _watch_batch_scope(pending_pous, pending_generic_change)
                 pending_pous.clear()
                 pending_generic_change = False
 
                 if scope:
-                    graph = run_generate(cfg, level=level, ai_enabled=ai_enabled, scope=scope)
+                    graph = run_generate(
+                        cfg, level=level, ai_enabled=ai_enabled, scope=scope
+                    )
                     meta = getattr(graph, "_regen_meta", {})
                     touched = ", ".join(meta.get("touched_pous", [])) or "—"
                     click.echo(
@@ -536,6 +626,7 @@ def watch(level: int, debounce_ms: int, config_path: str | None) -> None:
 # ---------------------------------------------------------------------------
 # as-docs install-hook
 # ---------------------------------------------------------------------------
+
 
 @cli.command("install-hook")
 @click.option("--yes", is_flag=True, help="Install without confirmation prompt.")
@@ -558,7 +649,9 @@ def install_hook(yes: bool, force: bool, config_path: str | None) -> None:
     hook_file = hooks_dir / "post-commit"
 
     if not yes:
-        if not click.confirm(f"Install as-docs post-commit hook in {hook_file}?", default=True):
+        if not click.confirm(
+            f"Install as-docs post-commit hook in {hook_file}?", default=True
+        ):
             click.echo("Hook installation cancelled.")
             return
 
@@ -596,6 +689,7 @@ def install_hook(yes: bool, force: bool, config_path: str | None) -> None:
 # ---------------------------------------------------------------------------
 # as-docs diff
 # ---------------------------------------------------------------------------
+
 
 @cli.command()
 @click.argument("ref", default="HEAD~1")
@@ -643,6 +737,7 @@ def diff(ref: str, config_path: str | None) -> None:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _load_cfg(config_path: str | None) -> Config:
     p = Path(config_path) if config_path else None
@@ -793,7 +888,10 @@ def _merge_hook_block(
         normalized_new = block.strip()
         if normalized_existing == normalized_new:
             return existing if existing.endswith("\n") else existing + "\n", False
-        merged = "\n".join(part for part in [before, block.rstrip("\n"), after] if part) + "\n"
+        merged = (
+            "\n".join(part for part in [before, block.rstrip("\n"), after] if part)
+            + "\n"
+        )
         return merged, True
 
     if has_start or has_end:

@@ -1,4 +1,5 @@
 """Standalone packaging helpers for the optional Phase 7 executable."""
+
 from __future__ import annotations
 
 import os

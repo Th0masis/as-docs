@@ -1,4 +1,5 @@
 """ProjectModel: intermediate parse results assembled by scanner layer."""
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -9,6 +10,7 @@ from as_docs.model.graph import DataType, Edge, POUNode, TaskConfig, Variable
 @dataclass
 class RawSTFile:
     """Raw .st file before ST analysis."""
+
     path: Path
     pou_name: str
     source: str
@@ -20,6 +22,7 @@ class ProjectModel:
 
     Consumed by analyzer and generator layers.
     """
+
     project_root: Path
     project_name: str
     as_version: str

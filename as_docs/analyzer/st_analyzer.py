@@ -14,6 +14,7 @@ B&R naming conventions used as deterministic heuristics:
   *Enum type  → Enum literal on right side — READ of literal
   <FBType>_<suffix> → FB instance
 """
+
 from __future__ import annotations
 import re
 from dataclasses import dataclass, field
@@ -29,7 +30,9 @@ _IDENTIFIER = r"[A-Za-z_][A-Za-z0-9_]*"
 # FB call: Identifier( — not preceded by a keyword
 _CALL_RE = re.compile(rf"(?<!\w)({_IDENTIFIER})\s*\(")
 # Assignment left side
-_WRITE_RE = re.compile(rf"(?<!\w)({_IDENTIFIER}(?:\.{_IDENTIFIER}|\^\.{_IDENTIFIER})?)\s*:=")
+_WRITE_RE = re.compile(
+    rf"(?<!\w)({_IDENTIFIER}(?:\.{_IDENTIFIER}|\^\.{_IDENTIFIER})?)\s*:="
+)
 # Read: identifiers on right side or in conditions (post-filter)
 _READ_RE = re.compile(rf"(?<!\w)({_IDENTIFIER})\b")
 # Instance.Field input binding before FB call (assign-then-call)
@@ -50,14 +53,55 @@ _WHILE_RE = re.compile(r"\bWHILE\b", re.IGNORECASE)
 
 # Keywords to exclude from variable/call detection
 _ST_KEYWORDS = frozenset(
-    w.upper() for w in (
-        "IF", "THEN", "ELSE", "ELSIF", "END_IF", "CASE", "OF", "END_CASE",
-        "FOR", "TO", "BY", "DO", "END_FOR", "WHILE", "END_WHILE", "REPEAT",
-        "UNTIL", "END_REPEAT", "RETURN", "EXIT", "CONTINUE", "NOT", "AND",
-        "OR", "XOR", "MOD", "TRUE", "FALSE", "VAR", "END_VAR", "VAR_INPUT",
-        "VAR_OUTPUT", "VAR_IN_OUT", "PROGRAM", "FUNCTION_BLOCK", "FUNCTION",
-        "END_PROGRAM", "END_FUNCTION_BLOCK", "END_FUNCTION", "STRUCT",
-        "END_STRUCT", "TYPE", "END_TYPE", "ARRAY", "OF", "AT", "RETAIN",
+    w.upper()
+    for w in (
+        "IF",
+        "THEN",
+        "ELSE",
+        "ELSIF",
+        "END_IF",
+        "CASE",
+        "OF",
+        "END_CASE",
+        "FOR",
+        "TO",
+        "BY",
+        "DO",
+        "END_FOR",
+        "WHILE",
+        "END_WHILE",
+        "REPEAT",
+        "UNTIL",
+        "END_REPEAT",
+        "RETURN",
+        "EXIT",
+        "CONTINUE",
+        "NOT",
+        "AND",
+        "OR",
+        "XOR",
+        "MOD",
+        "TRUE",
+        "FALSE",
+        "VAR",
+        "END_VAR",
+        "VAR_INPUT",
+        "VAR_OUTPUT",
+        "VAR_IN_OUT",
+        "PROGRAM",
+        "FUNCTION_BLOCK",
+        "FUNCTION",
+        "END_PROGRAM",
+        "END_FUNCTION_BLOCK",
+        "END_FUNCTION",
+        "STRUCT",
+        "END_STRUCT",
+        "TYPE",
+        "END_TYPE",
+        "ARRAY",
+        "OF",
+        "AT",
+        "RETAIN",
     )
 )
 
@@ -69,11 +113,13 @@ _IO_READ_PREFIXES = ("di", "si", "ai", "at")
 @dataclass
 class STAnalysisResult:
     pou_name: str
-    calls: list[str] = field(default_factory=list)          # POU names called
-    writes: list[str] = field(default_factory=list)         # variable names written
-    reads: list[str] = field(default_factory=list)          # variable names read
-    instances: list[str] = field(default_factory=list)      # FB instance names
-    instance_types: dict[str, str] = field(default_factory=dict)  # instance name -> FB type
+    calls: list[str] = field(default_factory=list)  # POU names called
+    writes: list[str] = field(default_factory=list)  # variable names written
+    reads: list[str] = field(default_factory=list)  # variable names read
+    instances: list[str] = field(default_factory=list)  # FB instance names
+    instance_types: dict[str, str] = field(
+        default_factory=dict
+    )  # instance name -> FB type
     # Flow hints for Level 4
     has_case: bool = False
     has_if: bool = False
@@ -214,7 +260,11 @@ def _extract_fb_instances(source: str) -> dict[str, str]:
 
 def _find_binding_prefixes(source: str, instance_names: set[str]) -> set[str]:
     """Find instance names used in assign-then-call input binding patterns."""
-    return {m.group(1) for m in _INSTANCE_BINDING_RE.finditer(source) if m.group(1) in instance_names}
+    return {
+        m.group(1)
+        for m in _INSTANCE_BINDING_RE.finditer(source)
+        if m.group(1) in instance_names
+    }
 
 
 def _is_primitive_type(name: str) -> bool:

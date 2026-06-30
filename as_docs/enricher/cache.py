@@ -22,7 +22,9 @@ class EnrichmentCache:
         self._model = model
         self._cache_dir.mkdir(parents=True, exist_ok=True)
 
-    def get(self, scope: str, name: str, level: int, content: str) -> EnrichmentPayload | None:
+    def get(
+        self, scope: str, name: str, level: int, content: str
+    ) -> EnrichmentPayload | None:
         path = self._path_for(scope=scope, name=name, level=level, content=content)
         if not path.exists():
             return None
@@ -35,7 +37,14 @@ class EnrichmentCache:
             notes=str(raw.get("notes", "")),
         )
 
-    def set(self, scope: str, name: str, level: int, content: str, payload: EnrichmentPayload) -> None:
+    def set(
+        self,
+        scope: str,
+        name: str,
+        level: int,
+        content: str,
+        payload: EnrichmentPayload,
+    ) -> None:
         path = self._path_for(scope=scope, name=name, level=level, content=content)
         data = {
             "provider": self._provider,
@@ -51,7 +60,9 @@ class EnrichmentCache:
         digest = _hash_content(content)
         safe_model = self._model.replace("/", "_").replace(":", "_")
         safe_name = name.replace(" ", "_")
-        filename = f"{scope}.{safe_name}.L{level}.{self._provider}.{safe_model}.{digest}.json"
+        filename = (
+            f"{scope}.{safe_name}.L{level}.{self._provider}.{safe_model}.{digest}.json"
+        )
         return self._cache_dir / filename
 
 
