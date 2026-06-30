@@ -168,13 +168,19 @@ git:
 @click.option("--level", default=None, type=int, help="Documentation level (1–4). Default from config.")
 @click.option("--no-ai", "no_ai", is_flag=True, help="Skip AI enrichment (Level 1 only).")
 @click.option("--use-as-cli", "use_as_cli", is_flag=True, help="Enable as-cli integration (if available). Overrides config.")
+@click.option("--scope", default="all", type=str, help="Regeneration scope: all, changed, or pou:<name>.")
 @click.option("--config", "config_path", default=None, type=click.Path(), help="Path to .as-docs.yaml")
 @click.pass_context
-def generate(ctx: click.Context, level: int | None, no_ai: bool, use_as_cli: bool, config_path: str | None) -> None:
+def generate(ctx: click.Context, level: int | None, no_ai: bool, use_as_cli: bool, scope: str, config_path: str | None) -> None:
     """Generate documentation for the AS project.
     
     By default, uses filesystem scanner. With --use-as-cli, attempts to merge
     as-cli data (if available). Falls back to filesystem if as-cli unavailable.
+    
+    Scoping:
+      --scope all         Regenerate all POUs (default)
+      --scope changed     Regenerate only POUs with changed source files
+      --scope pou:NAME    Regenerate only the named POU
     """
     from as_docs.engine import run_generate
 
@@ -189,9 +195,11 @@ def generate(ctx: click.Context, level: int | None, no_ai: bool, use_as_cli: boo
         )
     if use_as_cli:
         click.echo("as-cli integration enabled (will merge if available)")
+    if scope != "all":
+        click.echo(f"Scope: {scope}")
 
     try:
-        graph = run_generate(cfg, level=effective_level, ai_enabled=ai_enabled, use_as_cli=use_as_cli)
+        graph = run_generate(cfg, level=effective_level, ai_enabled=ai_enabled, use_as_cli=use_as_cli, scope=scope)
         out = Path(cfg.output.docs_dir)
         click.echo(f"\nDone — {len(graph.pous)} POUs, {len(graph.tasks)} tasks")
         if ai_enabled:
