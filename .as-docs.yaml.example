@@ -47,3 +47,18 @@ output:
 git:
   hook_enabled: false               # set true after as-docs install-hook
   auto_level: 2                     # level to regenerate on commit
+
+# Optional: Use as-cli for project discovery
+# Requires: as-cli installed and in PATH (see https://github.com/br-automation-com/as-cli)
+# 
+# When enabled, as-docs uses as-cli logical_list and symbol_search commands
+# for more accurate project discovery (catches nested packages, implicit programs).
+# Falls back gracefully to filesystem scanning if as-cli is unavailable.
+as_cli:
+  enabled: false                    # Set to true if as-cli is installed and you want to use it
+  path: "as-cli"                    # Path to as-cli executable (auto-detect from PATH by default)
+  timeout_ms: 30000                 # Timeout per as-cli command (milliseconds)
+  strict: false                     # If true, fail on as-cli errors; if false, fall back to filesystem
+  use_commands:                     # Which as-cli commands to use
+    - logical_list                  # Module/task/program hierarchy
+    - symbol_search                 # All symbols in project
