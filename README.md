@@ -6,10 +6,12 @@ Parses AS project files, extracts structural and semantic information, optionall
 
 ## Documentation Index
 
-- `README.md` — quick start, CLI commands, configuration, and current implementation status
-- `as-docs-architecture.md` — full architecture, data model, implementation phases, and decisions
-- `EXECUTION_CHECKLIST.md` — live execution tracker for prioritized remaining work
-- `.as-docs.yaml.example` — complete configuration template with comments
+- `README.md` — this file: quick start, CLI commands, configuration, and current implementation status
+- `as-docs-architecture.md` — full architecture, data model, phases 1-7, and design decisions
+- `CHANGELOG.md` — version history and release notes
+- `docs/AS_CLI_INTEGRATION_ARCHITECTURE.md` — detailed as-cli integration architecture and data flow
+- `docs/PHASE_2_7_VALIDATION_REPORT.md` — Phase 2.7 test coverage report and validation checklist
+- `.as-docs.yaml.example` — complete configuration template with detailed comments
 
 ## Features
 

@@ -2,7 +2,7 @@
 
 > **Purpose of this document:** Complete reference for AI agents and developers cooperating on the `as-docs` project. Contains all architectural decisions, data models, file structures, and implementation phases. Do not contradict decisions documented here without explicit confirmation from the project owner.
 
-> **Status note (2026-06-25):** This document includes both implemented behavior and target-state roadmap items. For the current implementation delta, see `README.md` (Current Status) and the live tracker `EXECUTION_CHECKLIST.md`.
+> **Status note (2026-06-30):** This document captures the overall architecture and design decisions. For the current implementation status, see `README.md`. For as-cli integration details, see `docs/AS_CLI_INTEGRATION_ARCHITECTURE.md`. For validation report, see `docs/PHASE_2_7_VALIDATION_REPORT.md`.
 
 ---
 
