@@ -1,0 +1,70 @@
+name: Lint & Format
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    name: Ruff Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install ruff
+        run: pip install ruff
+      
+      - name: Lint with Ruff
+        run: ruff check as_docs/ tests/ --output-format=github
+
+  format:
+    name: Ruff Format Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install ruff
+        run: pip install ruff
+      
+      - name: Check formatting
+        run: ruff format as_docs/ tests/ --check --diff
+
+  type-check:
+    name: Type Check (Pyright)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          pip install pyright
+      
+      - name: Run Pyright
+        run: pyright as_docs/

@@ -1,4 +1,5 @@
 """Level 4 Mermaid flow-diagram generation."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,11 +24,26 @@ def build_flow_diagram(
     if ai_enabled and not narrative:
         narrative = f"Parsed Level 4 control flow for {pou_name}."
 
+    # Validate and normalize diagram_type
+    diagram_type = extracted.diagram_type or "flowchart"
+    if diagram_type not in ("stateDiagram-v2", "flowchart", "sequenceDiagram"):
+        diagram_type = "flowchart"
+
+    # Validate and normalize confidence
+    confidence = extracted.confidence or "MEDIUM"
+    if confidence not in ("HIGH", "MEDIUM", "LOW"):
+        confidence = "MEDIUM"
+
+    # Validate and normalize source
+    source = extracted.source or "parsed"
+    if source not in ("parsed", "parsed+ai", "ai-generated"):
+        source = "parsed"
+
     return FlowDiagram(
         pou_name=pou_name,
-        diagram_type=extracted.diagram_type,
-        confidence=extracted.confidence,
-        source=extracted.source,
+        diagram_type=diagram_type,  # type: ignore
+        confidence=confidence,  # type: ignore
+        source=source,  # type: ignore
         mermaid_code=mermaid,
         narrative=narrative,
     )
@@ -90,7 +106,6 @@ def _state_mermaid(extracted: FlowExtractionResult) -> str:
 def _flowchart_mermaid(extracted: FlowExtractionResult) -> str:
     lines = ["flowchart TD"]
     for node in extracted.nodes:
-        shape = "[" if node.node_type in {"action", "branch"} else "(" if node.node_type == "start" else "["
         if node.node_type == "branch":
             lines.append(f'    {_safe_id(node.node_id)}{{"{node.label}"}}')
         elif node.node_type == "start":
@@ -99,7 +114,7 @@ def _flowchart_mermaid(extracted: FlowExtractionResult) -> str:
             lines.append(f'    {_safe_id(node.node_id)}["{node.label}"]')
 
     for edge in extracted.edges:
-        label = f' | {edge.label} |' if edge.label else ""
+        label = f" | {edge.label} |" if edge.label else ""
         lines.append(f"    {_safe_id(edge.source)} -->{label} {_safe_id(edge.target)}")
 
     return "\n".join(lines)

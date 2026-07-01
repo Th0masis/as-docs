@@ -47,8 +47,10 @@ def _resolve_vscode_token_windows() -> str | None:
         return None
 
     class _FILETIME(ctypes.Structure):
-        _fields_ = [("dwLowDateTime", ctypes.wintypes.DWORD),
-                    ("dwHighDateTime", ctypes.wintypes.DWORD)]
+        _fields_ = [
+            ("dwLowDateTime", ctypes.wintypes.DWORD),
+            ("dwHighDateTime", ctypes.wintypes.DWORD),
+        ]
 
     class _CREDENTIAL(ctypes.Structure):
         _fields_ = [
@@ -93,7 +95,9 @@ def _resolve_vscode_token_windows() -> str | None:
                 for sess in sessions:
                     tok = sess.get("accessToken", "").strip()
                     if tok:
-                        _LOG.info("Using VS Code GitHub session token from Windows Credential Manager.")
+                        _LOG.info(
+                            "Using VS Code GitHub session token from Windows Credential Manager."
+                        )
                         return tok
         finally:
             advapi32.CredFree(pcred)
@@ -138,6 +142,7 @@ def _save_device_flow_token(token: str) -> None:
         _TOKEN_CACHE_PATH.write_text(token, encoding="utf-8")
         if platform.system() != "Windows":
             import stat as _stat
+
             _TOKEN_CACHE_PATH.chmod(_stat.S_IRUSR | _stat.S_IWUSR)
     except OSError as exc:
         _LOG.debug("Could not save device flow token to cache: %s", exc)
@@ -171,7 +176,9 @@ def _resolve_github_token_via_device_flow(client_id: str) -> str | None:
 
     # Step 1: request a device + user code.
     try:
-        body = json.dumps({"client_id": client_id, "scope": _DEVICE_FLOW_SCOPE}).encode()
+        body = json.dumps(
+            {"client_id": client_id, "scope": _DEVICE_FLOW_SCOPE}
+        ).encode()
         req = urllib.request.Request(
             _DEVICE_CODE_URL,
             data=body,
@@ -195,7 +202,7 @@ def _resolve_github_token_via_device_flow(client_id: str) -> str | None:
         return None
 
     # Step 2: prompt the user.
-    print(f"\n  GitHub OAuth — Device Flow")
+    print("\n  GitHub OAuth — Device Flow")
     print(f"  1. Open:       {verification_uri}")
     print(f"  2. Enter code: {user_code}")
     print(f"  Waiting for authorization (expires in {expires_in}s) ...\n")
@@ -206,15 +213,20 @@ def _resolve_github_token_via_device_flow(client_id: str) -> str | None:
     while time.monotonic() < deadline:
         time.sleep(current_interval)
         try:
-            poll_body = json.dumps({
-                "client_id": client_id,
-                "device_code": device_code,
-                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
-            }).encode()
+            poll_body = json.dumps(
+                {
+                    "client_id": client_id,
+                    "device_code": device_code,
+                    "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                }
+            ).encode()
             req = urllib.request.Request(
                 _OAUTH_TOKEN_URL,
                 data=poll_body,
-                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
@@ -236,7 +248,9 @@ def _resolve_github_token_via_device_flow(client_id: str) -> str | None:
             current_interval += _SLOW_DOWN_INCREMENT
             continue
         # Fatal: expired_token, access_denied, incorrect_client_credentials, …
-        _LOG.debug("Device flow error: %s — %s", error, result.get("error_description", ""))
+        _LOG.debug(
+            "Device flow error: %s — %s", error, result.get("error_description", "")
+        )
         return None
 
     _LOG.debug("Device flow timed out (expires_in=%s s).", expires_in)
@@ -345,7 +359,9 @@ def _verify_copilot_entitlement(token: str) -> str:
             "Sign in to GitHub in VS Code or run 'gh auth login'."
         ) from exc
     except Exception as exc:
-        raise RuntimeError(f"Could not reach GitHub API to verify credentials: {exc}") from exc
+        raise RuntimeError(
+            f"Could not reach GitHub API to verify credentials: {exc}"
+        ) from exc
 
     # Step 2: verify Copilot entitlement via the internal token endpoint.
     try:
@@ -405,17 +421,21 @@ def _send_via_copilot_http(
         "Editor-Version": "vscode/1.90.0",
         "Editor-Plugin-Version": "copilot-chat/0.15.0",
     }
-    body = json.dumps({
-        "model": model,
-        "max_tokens": max_tokens,
-        "messages": [
-            {"role": "system", "content": SYSTEM_INSTRUCTION},
-            {"role": "user", "content": prompt},
-        ],
-    }).encode()
+    body = json.dumps(
+        {
+            "model": model,
+            "max_tokens": max_tokens,
+            "messages": [
+                {"role": "system", "content": SYSTEM_INSTRUCTION},
+                {"role": "user", "content": prompt},
+            ],
+        }
+    ).encode()
 
     try:
-        req = urllib.request.Request(_COPILOT_CHAT_URL, data=body, headers=headers, method="POST")
+        req = urllib.request.Request(
+            _COPILOT_CHAT_URL, data=body, headers=headers, method="POST"
+        )
         with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
             result = json.loads(resp.read())
         content = result["choices"][0]["message"]["content"]
@@ -424,7 +444,9 @@ def _send_via_copilot_http(
         return content
     except urllib.error.HTTPError as exc:
         body_text = exc.read().decode(errors="replace")
-        raise RuntimeError(f"Copilot API request failed (HTTP {exc.code}): {body_text}") from exc
+        raise RuntimeError(
+            f"Copilot API request failed (HTTP {exc.code}): {body_text}"
+        ) from exc
 
 
 class CopilotProvider:
@@ -443,7 +465,9 @@ class CopilotProvider:
             try:
                 self._github_login = _verify_copilot_entitlement(token)
             except Exception as exc:
-                _LOG.info("Copilot preflight check inconclusive; continuing with SDK auth.")
+                _LOG.info(
+                    "Copilot preflight check inconclusive; continuing with SDK auth."
+                )
                 _LOG.debug("Copilot preflight details: %s", exc)
         else:
             _LOG.info(
@@ -454,7 +478,9 @@ class CopilotProvider:
         # Do NOT store the raw token — the Copilot SDK auto-discovers
         # VS Code credentials at runtime.
 
-    def enrich_task(self, prompt: str, model: str, max_tokens: int) -> EnrichmentPayload:
+    def enrich_task(
+        self, prompt: str, model: str, max_tokens: int
+    ) -> EnrichmentPayload:
         return self._request(prompt=prompt, model=model, max_tokens=max_tokens)
 
     def enrich_pou(self, prompt: str, model: str, max_tokens: int) -> EnrichmentPayload:
@@ -469,12 +495,20 @@ class CopilotProvider:
                 raw_json = extract_json_block(content, provider_name="Copilot")
                 parsed = json.loads(raw_json)
                 return _normalize_payload(parsed)
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(
+                    f"Copilot provider returned invalid JSON: {exc}"
+                ) from exc
             except (RuntimeError, TimeoutError, Exception) as exc:
                 if _is_sdk_not_installed_error(exc):
                     # The github-copilot-sdk package is absent; fall back to HTTP if possible.
                     if _has_resolvable_github_token(self._cfg.api_key_env):
-                        _LOG.info("Copilot SDK not installed; attempting direct HTTP API fallback.")
-                        return self._request_via_http(prompt=prompt, model=model, max_tokens=max_tokens)
+                        _LOG.info(
+                            "Copilot SDK not installed; attempting direct HTTP API fallback."
+                        )
+                        return self._request_via_http(
+                            prompt=prompt, model=model, max_tokens=max_tokens
+                        )
                     raise RuntimeError(
                         "The 'github-copilot-sdk' package is not installed and no GitHub token "
                         "is available for the HTTP fallback. "
@@ -485,8 +519,12 @@ class CopilotProvider:
                     # SDK auth failure: only try HTTP fallback when a token is actually available.
                     # Otherwise preserve the original SDK error to avoid masking the root cause.
                     if _has_resolvable_github_token(self._cfg.api_key_env):
-                        _LOG.info("SDK auth failed; attempting direct Copilot HTTP API fallback.")
-                        return self._request_via_http(prompt=prompt, model=model, max_tokens=max_tokens)
+                        _LOG.info(
+                            "SDK auth failed; attempting direct Copilot HTTP API fallback."
+                        )
+                        return self._request_via_http(
+                            prompt=prompt, model=model, max_tokens=max_tokens
+                        )
                     if attempt >= max_attempts:
                         raise RuntimeError(
                             f"Copilot SDK authentication failed. "
@@ -501,11 +539,11 @@ class CopilotProvider:
                         prompt=prompt, model=model, max_tokens=max_tokens
                     )
                 if attempt >= max_attempts:
-                    raise RuntimeError(f"Copilot provider request failed: {exc}") from exc
+                    raise RuntimeError(
+                        f"Copilot provider request failed: {exc}"
+                    ) from exc
                 last_exc = exc
                 time.sleep(0.4 * attempt)
-            except json.JSONDecodeError as exc:
-                raise RuntimeError(f"Copilot provider returned invalid JSON: {exc}") from exc
 
         raise RuntimeError(f"Copilot provider request failed after retries: {last_exc}")
 
@@ -529,7 +567,9 @@ class CopilotProvider:
                 return _normalize_payload(parsed)
             except Exception as exc:
                 if _is_sdk_model_error(exc):
-                    _LOG.warning("Fallback model '%s' also unavailable; trying next.", fb_model)
+                    _LOG.warning(
+                        "Fallback model '%s' also unavailable; trying next.", fb_model
+                    )
                     continue
                 if _is_sdk_auth_error(exc):
                     if _has_resolvable_github_token(self._cfg.api_key_env):
@@ -544,10 +584,14 @@ class CopilotProvider:
                 continue
 
         # All SDK fallbacks exhausted — try the HTTP fallback with the original model.
-        _LOG.info("All SDK model fallbacks exhausted; attempting direct Copilot HTTP fallback.")
+        _LOG.info(
+            "All SDK model fallbacks exhausted; attempting direct Copilot HTTP fallback."
+        )
         return self._request_via_http(prompt=prompt, model=model, max_tokens=max_tokens)
 
-    def _request_via_http(self, prompt: str, model: str, max_tokens: int) -> EnrichmentPayload:
+    def _request_via_http(
+        self, prompt: str, model: str, max_tokens: int
+    ) -> EnrichmentPayload:
         """Direct HTTP fallback — works from any terminal without VS Code session auth."""
         token = _resolve_github_token(self._cfg.api_key_env)
         if not token:
@@ -567,7 +611,10 @@ class CopilotProvider:
             if _is_copilot_scope_error(exc):
                 # The resolved token exists but lacks the Copilot scope (HTTP 404).
                 # Try OAuth Device Flow if a client_id is available.
-                client_id = self._cfg.oauth_client_id or os.getenv("AS_DOCS_OAUTH_CLIENT_ID", "").strip()
+                client_id = (
+                    self._cfg.oauth_client_id
+                    or os.getenv("AS_DOCS_OAUTH_CLIENT_ID", "").strip()
+                )
                 if client_id:
                     _LOG.info(
                         "Token lacks Copilot scope; starting OAuth Device Flow for a scoped token."
@@ -602,24 +649,34 @@ class CopilotProvider:
 
     def _send_with_sdk(self, prompt: str, model: str, max_tokens: int) -> str:
         try:
-            return asyncio.run(self._send_with_sdk_async(prompt=prompt, model=model, max_tokens=max_tokens))
+            return asyncio.run(
+                self._send_with_sdk_async(
+                    prompt=prompt, model=model, max_tokens=max_tokens
+                )
+            )
         except RuntimeError as exc:
             if "asyncio.run() cannot be called" not in str(exc):
                 raise
             loop = asyncio.new_event_loop()
             try:
                 return loop.run_until_complete(
-                    self._send_with_sdk_async(prompt=prompt, model=model, max_tokens=max_tokens)
+                    self._send_with_sdk_async(
+                        prompt=prompt, model=model, max_tokens=max_tokens
+                    )
                 )
             finally:
                 loop.close()
 
-    async def _send_with_sdk_async(self, prompt: str, model: str, max_tokens: int) -> str:
+    async def _send_with_sdk_async(
+        self, prompt: str, model: str, max_tokens: int
+    ) -> str:
         try:
             from copilot import CopilotClient
             from copilot.session import PermissionHandler
             from copilot.session_events import AssistantMessageData
-        except Exception as exc:  # pragma: no cover - exercised when dependency is missing
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - exercised when dependency is missing
             raise RuntimeError(
                 "Copilot SDK is not installed. Install package 'github-copilot-sdk'."
             ) from exc
@@ -686,7 +743,9 @@ class CopilotProvider:
             except Exception:
                 force_stop = getattr(client, "force_stop", None)
                 if callable(force_stop):
-                    await force_stop()
+                    result = force_stop()
+                    if hasattr(result, "__await__"):
+                        await result  # type: ignore
 
 
 def _is_sdk_not_installed_error(exc: Exception) -> bool:
@@ -733,11 +792,15 @@ def _sdk_auth_error_message(api_key_env: str) -> str:
 def _normalize_payload(data: dict[str, Any]) -> EnrichmentPayload:
     desc = str(data.get("description", "")).strip()
     if not desc:
-        raise RuntimeError("Copilot provider response is missing non-empty 'description'.")
+        raise RuntimeError(
+            "Copilot provider response is missing non-empty 'description'."
+        )
 
     responsibilities = data.get("responsibilities", [])
     if not isinstance(responsibilities, list):
-        raise RuntimeError("Copilot provider response field 'responsibilities' must be an array.")
+        raise RuntimeError(
+            "Copilot provider response field 'responsibilities' must be an array."
+        )
 
     patterns = data.get("patterns", [])
     if not isinstance(patterns, list):
@@ -747,7 +810,9 @@ def _normalize_payload(data: dict[str, Any]) -> EnrichmentPayload:
 
     return EnrichmentPayload(
         description=desc,
-        responsibilities=[str(item).strip() for item in responsibilities if str(item).strip()],
+        responsibilities=[
+            str(item).strip() for item in responsibilities if str(item).strip()
+        ],
         patterns=[str(item).strip() for item in patterns if str(item).strip()],
         notes=notes,
     )

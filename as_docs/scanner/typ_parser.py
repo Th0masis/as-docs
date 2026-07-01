@@ -1,4 +1,5 @@
 """Parser for .typ files — extracts STRUCT, ENUM, and ALIAS definitions."""
+
 from __future__ import annotations
 import re
 from pathlib import Path
@@ -47,13 +48,15 @@ def parse_typ_file(path: Path) -> list[DataType]:
             name = struct_match.group(1)
             members_text = struct_match.group(2)
             members = _parse_struct_members(members_text)
-            results.append(DataType(
-                name=name,
-                kind="STRUCT",
-                members=members,
-                alias_target=None,
-                source_file=source_file,
-            ))
+            results.append(
+                DataType(
+                    name=name,
+                    kind="STRUCT",
+                    members=members,
+                    alias_target=None,
+                    source_file=source_file,
+                )
+            )
 
         # ENUM definitions: TypeName : (VALUE1, VALUE2, VALUE3);
         for enum_match in _ENUM_BLOCK_RE.finditer(body):
@@ -62,13 +65,15 @@ def parse_typ_file(path: Path) -> list[DataType]:
                 continue
             values_text = enum_match.group(2)
             members = _parse_enum_values(values_text)
-            results.append(DataType(
-                name=name,
-                kind="ENUM",
-                members=members,
-                alias_target=None,
-                source_file=source_file,
-            ))
+            results.append(
+                DataType(
+                    name=name,
+                    kind="ENUM",
+                    members=members,
+                    alias_target=None,
+                    source_file=source_file,
+                )
+            )
 
         # ALIAS definitions (simple type aliases)
         remaining = _STRUCT_BLOCK_RE.sub("", body)
@@ -77,13 +82,15 @@ def parse_typ_file(path: Path) -> list[DataType]:
             name = alias_match.group(1)
             target = alias_match.group(2)
             if name.upper() not in ("STRUCT", "ENUM", "TYPE", "END_TYPE"):
-                results.append(DataType(
-                    name=name,
-                    kind="ALIAS",
-                    members=[],
-                    alias_target=target,
-                    source_file=source_file,
-                ))
+                results.append(
+                    DataType(
+                        name=name,
+                        kind="ALIAS",
+                        members=[],
+                        alias_target=target,
+                        source_file=source_file,
+                    )
+                )
 
     return results
 
@@ -112,13 +119,15 @@ def _parse_struct_members(text: str) -> list[DataTypeMember]:
                 raw_desc = _UNIT_RE.sub("", raw_desc).strip()
             description = raw_desc
 
-        members.append(DataTypeMember(
-            name=name,
-            member_type=member_type,
-            initial_value=initial_value,
-            description=description,
-            unit=unit,
-        ))
+        members.append(
+            DataTypeMember(
+                name=name,
+                member_type=member_type,
+                initial_value=initial_value,
+                description=description,
+                unit=unit,
+            )
+        )
     return members
 
 
@@ -132,9 +141,11 @@ def _parse_enum_values(text: str) -> list[DataTypeMember]:
         part_clean = re.sub(r"\(\*.*?\*\)", "", part).strip()
         m = _ENUM_VALUE_RE.match(part_clean)
         if m:
-            members.append(DataTypeMember(
-                name=m.group(1),
-                member_type="ENUM_VALUE",
-                initial_value=m.group(2),
-            ))
+            members.append(
+                DataTypeMember(
+                    name=m.group(1),
+                    member_type="ENUM_VALUE",
+                    initial_value=m.group(2),
+                )
+            )
     return members

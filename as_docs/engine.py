@@ -1,10 +1,13 @@
 """Core engine — orchestrates scan → analyze → generate pipeline."""
+
 from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
+import logging
+from typing import TYPE_CHECKING
 
-from as_docs.config import Config, load_config
+from as_docs.config import Config
 from as_docs.model.graph import (
     SCHEMA_VERSION,
     Edge,
@@ -18,6 +21,13 @@ from as_docs.generator.json_gen import generate_json
 from as_docs.generator.flow_diagram_gen import build_flow_diagram
 from as_docs.generator.markdown_gen import generate_all_markdown
 from as_docs.generator.llms_txt_gen import generate_llms_txt
+from as_docs.scanner.as_cli_adapter import AsCliAdapter, AsCliError
+from as_docs.scanner.data_conflict_resolver import DataConflictResolver
+
+if TYPE_CHECKING:
+    from as_docs.scanner.data_conflict_resolver import ConflictReport
+
+logger = logging.getLogger(__name__)
 
 
 def run_generate(
@@ -26,6 +36,7 @@ def run_generate(
     ai_enabled: bool = False,
     project_root: Path | None = None,
     scope: str = "all",
+    use_as_cli: bool | None = None,
 ) -> KnowledgeGraph:
     """Run the full scan → analyze → generate pipeline.
 
@@ -34,17 +45,26 @@ def run_generate(
         level: Documentation level (1–4).
         ai_enabled: If True and level >= 2, call Claude API for enrichment.
         project_root: Override project root detection.
+        scope: Scope for regeneration (all, changed, pou:<name>).
+        use_as_cli: Override config to use as-cli for project discovery.
+                    Precedence: CLI flag > config setting > default (False).
 
     Returns:
         The assembled KnowledgeGraph.
     """
-    # 1. Scan
+    # 1. Scan (filesystem, optionally merged with as-cli)
     started = perf_counter()
     model = scan_project(config, project_root=project_root)
+
+    # 2. Optional as-cli integration
+    conflict_report = None
+    if _should_use_as_cli(use_as_cli, config):
+        conflict_report = _merge_as_cli_data(model, config, project_root)
+
     target_pous = _resolve_scope_targets(config, model, scope)
     touched_pous = sorted(target_pous)
 
-    # 2. Analyze + assemble graph
+    # 3. Analyze + assemble graph
     if scope == "all":
         graph = _build_full_graph(model, config=config, level=level)
     else:
@@ -57,18 +77,25 @@ def run_generate(
         )
         touched_pous = sorted(set(touched_pous).intersection(set(graph.pous.keys())))
 
-    # 5. AI enrichment (Level 2+)
+    # 4. AI enrichment (Level 2+)
     if ai_enabled and level >= 2:
         from as_docs.enricher.ai_enricher import enrich_graph
-        ai_stats = enrich_graph(graph, level=level, config=config)
+
+        ai_stats = enrich_graph(
+            graph, level=level, config=config, project_root=project_root
+        )
         setattr(graph, "_ai_stats", ai_stats)
 
     if level >= 4:
-        _populate_flow_diagrams(graph, model, ai_enabled=ai_enabled, scope=scope, target_pous=target_pous)
+        _populate_flow_diagrams(
+            graph, model, ai_enabled=ai_enabled, scope=scope, target_pous=target_pous
+        )
 
-    # 6. Generate outputs (honor configured output.formats)
+    # 5. Generate outputs (honor configured output.formats)
     output_dir = Path(config.output.docs_dir)
-    configured_formats = {f.strip().lower() for f in config.output.formats if str(f).strip()}
+    configured_formats = {
+        f.strip().lower() for f in config.output.formats if str(f).strip()
+    }
     if not configured_formats:
         configured_formats = {"markdown", "json", "llms.txt"}
 
@@ -79,6 +106,16 @@ def run_generate(
     if "llms.txt" in configured_formats or "llms" in configured_formats:
         generate_llms_txt(graph, output_dir)
 
+    # 6. Write POU hash files for freshness tracking (if not already done)
+    if level < 3 or not ai_enabled:
+        from as_docs.enricher.ai_enricher import _write_pou_hashes
+
+        _write_pou_hashes(graph, config, project_root)
+
+    # 7. Save conflict report if as-cli was used
+    if conflict_report is not None:
+        _save_conflict_report(conflict_report, output_dir)
+
     setattr(
         graph,
         "_regen_meta",
@@ -88,13 +125,125 @@ def run_generate(
             "elapsed_seconds": round(perf_counter() - started, 3),
             "scanned_pous": len(model.pous),
             "fallback_full": bool(getattr(graph, "_scoped_fallback_full", False)),
+            "as_cli_merge_report": conflict_report.to_dict()
+            if conflict_report
+            else None,
         },
     )
 
     return graph
 
 
+def _should_use_as_cli(cli_flag: bool | None, config: Config) -> bool:
+    """Determine if as-cli should be used (precedence: CLI > config > default).
+
+    Args:
+        cli_flag: CLI override (--use-as-cli)
+        config: Loaded configuration
+
+    Returns:
+        True if as-cli should be used
+    """
+    if cli_flag is not None:
+        return cli_flag
+    return config.as_cli.enabled
+
+
+def _merge_as_cli_data(
+    model: ProjectModel, config: Config, project_root: Path | None
+) -> ConflictReport | None:
+    """Attempt to merge as-cli data with filesystem scanner results.
+
+    Args:
+        model: ProjectModel from filesystem scanner
+        config: Loaded configuration
+        project_root: Project root path
+
+    Returns:
+        ConflictReport if merge was successful, None if fallback only (graceful)
+    """
+    logger.info("Attempting as-cli integration...")
+
+    try:
+        # Initialize adapter
+        adapter = AsCliAdapter(
+            as_cli_path=config.as_cli.path,
+            project_path=str(project_root or "."),
+            timeout_ms=config.as_cli.timeout_ms,
+        )
+
+        # Check availability
+        if not adapter.is_available():
+            raise AsCliError("as-cli is not available (not found or not installed)")
+
+        # Scan project with as-cli
+        logger.debug("Scanning project with as-cli...")
+        as_cli_data = adapter.scan_project()
+
+        # Merge with filesystem data
+        resolver = DataConflictResolver()
+        merged_pous, conflict_report = resolver.merge(model.pous, as_cli_data)
+
+        # Update model with merged data
+        model.pous = merged_pous
+
+        logger.info(
+            f"as-cli merge complete: {conflict_report.pou_count_merged} POUs, "
+            f"{len(conflict_report.conflicts)} conflicts"
+        )
+
+        return conflict_report
+
+    except AsCliError as e:
+        # Graceful fallback
+        if config.as_cli.strict:
+            logger.error(f"as-cli integration failed (strict mode): {e}")
+            raise
+
+        logger.warning(f"as-cli integration failed, falling back to filesystem: {e}")
+        return None
+
+    except Exception as e:
+        # Unexpected error
+        if config.as_cli.strict:
+            logger.error(f"Unexpected error in as-cli integration (strict mode): {e}")
+            raise
+
+        logger.warning(f"Unexpected error in as-cli integration, falling back: {e}")
+        return None
+
+
+def _save_conflict_report(conflict_report: ConflictReport, output_dir: Path) -> None:
+    """Save conflict report to output directory.
+
+    Args:
+        conflict_report: ConflictReport to save
+        output_dir: Output directory path
+    """
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        report_file = output_dir / "as_cli_conflict_report.json"
+
+        with report_file.open("w", encoding="utf-8") as f:
+            f.write(conflict_report.to_json())
+
+        logger.info(f"Conflict report saved to {report_file}")
+
+    except Exception as e:
+        logger.warning(f"Failed to save conflict report: {e}")
+
+
 def _resolve_scope_targets(config: Config, model: ProjectModel, scope: str) -> set[str]:
+    """Resolve target POUs for the given scope.
+
+    Args:
+        config: Loaded configuration
+        model: ProjectModel to resolve targets from
+        scope: Scope specification (all, changed, pou:<name>)
+
+    Returns:
+        Set of target POU names
+    """
     if scope == "all":
         return set(model.pous.keys())
 
@@ -117,7 +266,9 @@ def _resolve_scope_targets(config: Config, model: ProjectModel, scope: str) -> s
     raise ValueError("Invalid scope. Use one of: all, changed, pou:<name>.")
 
 
-def _build_full_graph(model: ProjectModel, config: Config, level: int) -> KnowledgeGraph:
+def _build_full_graph(
+    model: ProjectModel, config: Config, level: int
+) -> KnowledgeGraph:
     known_pous = set(model.pous.keys())
     known_vars = set(model.global_vars.keys())
     ext_prefixes = config.scanner.external_lib_prefixes
@@ -248,7 +399,9 @@ def _populate_flow_diagrams(
             continue
 
         narrative_hint = pou.description if ai_enabled else ""
-        diagram = build_flow_diagram(pou_name, source, ai_enabled=ai_enabled, narrative_hint=narrative_hint)
+        diagram = build_flow_diagram(
+            pou_name, source, ai_enabled=ai_enabled, narrative_hint=narrative_hint
+        )
         if diagram is not None:
             next_flow_diagrams[pou_name] = diagram
 
@@ -258,6 +411,7 @@ def _populate_flow_diagrams(
 def load_graph(config: Config) -> KnowledgeGraph | None:
     """Load an existing knowledge_graph.json. Returns None if not found."""
     import json
+
     graph_file = Path(config.output.docs_dir) / "knowledge_graph.json"
     if not graph_file.exists():
         return None
@@ -275,10 +429,12 @@ def load_graph(config: Config) -> KnowledgeGraph | None:
 def get_staleness(config: Config, project_root: Path | None = None) -> dict[str, str]:
     """Return a dict of pou_name → staleness status (fresh/stale/missing)."""
     import hashlib
+
     cache_dir = Path(config.ai.cache_dir)
 
     if project_root is None:
         from as_docs.config import find_project_root
+
         project_root = find_project_root() or Path(".")
 
     logical = project_root / "Logical"
@@ -303,7 +459,13 @@ def get_staleness(config: Config, project_root: Path | None = None) -> dict[str,
 def _dict_to_graph(data: dict) -> KnowledgeGraph:
     """Reconstruct KnowledgeGraph from JSON dict (shallow — for MCP use)."""
     from as_docs.model.graph import (
-        DataType, DataTypeMember, Edge, FlowDiagram, POUNode, TaskConfig, Variable,
+        DataType,
+        DataTypeMember,
+        Edge,
+        FlowDiagram,
+        POUNode,
+        TaskConfig,
+        Variable,
     )
 
     def _var(d: dict) -> Variable:

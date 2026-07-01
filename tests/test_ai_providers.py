@@ -3,8 +3,12 @@ from __future__ import annotations
 import pytest
 
 from as_docs.config import Config
-from as_docs.enricher.providers.anthropic_client import _normalize_payload as anthropic_normalize
-from as_docs.enricher.providers.copilot_client import _normalize_payload as copilot_normalize
+from as_docs.enricher.providers.anthropic_client import (
+    _normalize_payload as anthropic_normalize,
+)
+from as_docs.enricher.providers.copilot_client import (
+    _normalize_payload as copilot_normalize,
+)
 from as_docs.enricher.providers.factory import create_provider
 
 
@@ -17,7 +21,9 @@ def test_factory_returns_copilot_provider(monkeypatch) -> None:
     cfg = Config()
     cfg.ai.provider = "copilot"
 
-    monkeypatch.setattr("as_docs.enricher.providers.factory.CopilotProvider", _DummyProvider)
+    monkeypatch.setattr(
+        "as_docs.enricher.providers.factory.CopilotProvider", _DummyProvider
+    )
 
     provider = create_provider(cfg)
     assert isinstance(provider, _DummyProvider)
@@ -28,7 +34,9 @@ def test_factory_returns_anthropic_provider(monkeypatch) -> None:
     cfg = Config()
     cfg.ai.provider = "anthropic"
 
-    monkeypatch.setattr("as_docs.enricher.providers.factory.AnthropicProvider", _DummyProvider)
+    monkeypatch.setattr(
+        "as_docs.enricher.providers.factory.AnthropicProvider", _DummyProvider
+    )
 
     provider = create_provider(cfg)
     assert isinstance(provider, _DummyProvider)

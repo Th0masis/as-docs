@@ -4,6 +4,7 @@ B&R AS task config quirk: The <Task Name="..."> attribute is limited to
 10 characters. Match tasks to programs using the <Source> path attribute,
 not by name equality.
 """
+
 from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
@@ -15,7 +16,7 @@ _TASK_TYPE_MAP = {
     "cyclic": "cyclic",
     "init": "init",
     "exit": "exit",
-    "event": "cyclic",      # treat event tasks as cyclic for doc purposes
+    "event": "cyclic",  # treat event tasks as cyclic for doc purposes
 }
 
 # Regex fallbacks for malformed XML
@@ -73,13 +74,15 @@ def _parse_xml(text: str, configuration: str) -> list[TaskConfig]:
                 programs.append(prog_name)
 
         if task_name:
-            tasks.append(TaskConfig(
-                name=task_name,
-                task_type=task_type,  # type: ignore[arg-type]
-                cycle_time_ms=cycle_time_ms,
-                programs=programs,
-                configuration=configuration,
-            ))
+            tasks.append(
+                TaskConfig(
+                    name=task_name,
+                    task_type=task_type,  # type: ignore[arg-type]
+                    cycle_time_ms=cycle_time_ms,
+                    programs=programs,
+                    configuration=configuration,
+                )
+            )
 
     return tasks
 
@@ -110,7 +113,9 @@ def _parse_sw_configuration(root: ET.Element, configuration: str) -> list[TaskCo
         else:
             task_type = "cyclic"
 
-        cycle_time_ms = _parse_cycle_time(class_el.get("CycleTime", class_el.get("Cycle", "")))
+        cycle_time_ms = _parse_cycle_time(
+            class_el.get("CycleTime", class_el.get("Cycle", ""))
+        )
         programs: list[str] = []
 
         for task_el in class_el.iter(_tag(ns, "Task")):
@@ -135,19 +140,21 @@ def _parse_sw_configuration(root: ET.Element, configuration: str) -> list[TaskCo
 def _parse_regex_fallback(text: str, configuration: str) -> list[TaskConfig]:
     tasks = []
     for m in _TASK_RE.finditer(text):
-        tasks.append(TaskConfig(
-            name=m.group(1),
-            task_type="cyclic",
-            cycle_time_ms=None,
-            programs=[],
-            configuration=configuration,
-        ))
+        tasks.append(
+            TaskConfig(
+                name=m.group(1),
+                task_type="cyclic",
+                cycle_time_ms=None,
+                programs=[],
+                configuration=configuration,
+            )
+        )
     return tasks
 
 
 def _detect_namespace(tag: str) -> str:
     if tag.startswith("{"):
-        return tag[1:tag.index("}")]
+        return tag[1 : tag.index("}")]
     return ""
 
 

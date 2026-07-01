@@ -27,8 +27,12 @@ def test_standalone_executable_name_matches_platform() -> None:
         assert standalone_executable_name() == "as-docs-server"
 
 
-def test_build_standalone_plan_includes_pyinstaller_and_entrypoint(tmp_path: Path) -> None:
-    plan = build_standalone_plan(Path(__file__).resolve().parents[1], dist_dir=tmp_path / "dist")
+def test_build_standalone_plan_includes_pyinstaller_and_entrypoint(
+    tmp_path: Path,
+) -> None:
+    plan = build_standalone_plan(
+        Path(__file__).resolve().parents[1], dist_dir=tmp_path / "dist"
+    )
 
     assert plan.entrypoint.name == "cli.py"
     assert plan.executable_name.startswith("as-docs-server")

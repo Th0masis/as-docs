@@ -1,11 +1,14 @@
 """Call graph builder — assembles POU call hierarchy from ST analysis results."""
+
 from __future__ import annotations
 from as_docs.analyzer.st_analyzer import STAnalysisResult
-from as_docs.model.graph import Edge, KnowledgeGraph, POUNode, TaskConfig
+from as_docs.model.graph import Edge
 from as_docs.model.project import ProjectModel
 
 
-def build_edges(model: ProjectModel, analysis_results: list[STAnalysisResult]) -> list[Edge]:
+def build_edges(
+    model: ProjectModel, analysis_results: list[STAnalysisResult]
+) -> list[Edge]:
     """Build all graph edges from scan + analysis results.
 
     Edge types produced:
@@ -37,11 +40,13 @@ def build_edges(model: ProjectModel, analysis_results: list[STAnalysisResult]) -
         source_pou = result.pou_name
         for fb_type in result.instance_types.values():
             if fb_type in model.pous and fb_type != source_pou:
-                edges.append(Edge(
-                    source=source_pou,
-                    target=fb_type,
-                    edge_type="INSTANCE_OF",
-                ))
+                edges.append(
+                    Edge(
+                        source=source_pou,
+                        target=fb_type,
+                        edge_type="INSTANCE_OF",
+                    )
+                )
 
     return edges
 

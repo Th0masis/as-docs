@@ -1,4 +1,5 @@
 """Parser-first Level 4 flow extraction for Structured Text POUs."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -11,7 +12,9 @@ _STATE_LABEL_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*$")
 _CASE_RE = re.compile(r"\bCASE\s+(.+?)\s+OF\b", re.IGNORECASE)
 _IF_RE = re.compile(r"\bIF\s+(.+?)\s+THEN\b", re.IGNORECASE)
 _LOOP_RE = re.compile(r"\b(FOR|WHILE)\b", re.IGNORECASE)
-_STATE_ASSIGN_RE = re.compile(r"\bState\s*:=\s*([A-Za-z_][A-Za-z0-9_]*)\b", re.IGNORECASE)
+_STATE_ASSIGN_RE = re.compile(
+    r"\bState\s*:=\s*([A-Za-z_][A-Za-z0-9_]*)\b", re.IGNORECASE
+)
 
 
 @dataclass
@@ -32,7 +35,9 @@ class FlowExtractionResult:
     narrative: str = ""
 
 
-def extract_flow(pou_name: str, source: str, *, ai_enabled: bool = False) -> FlowExtractionResult | None:
+def extract_flow(
+    pou_name: str, source: str, *, ai_enabled: bool = False
+) -> FlowExtractionResult | None:
     """Extract a lightweight control-flow model from ST source.
 
     The extractor prefers deterministic parsing of CASE/IF/loop constructs.
@@ -47,7 +52,9 @@ def extract_flow(pou_name: str, source: str, *, ai_enabled: bool = False) -> Flo
         return None
 
     diagram_type = "stateDiagram-v2" if has_case else "flowchart"
-    confidence = "HIGH" if has_case and has_if else ("MEDIUM" if has_case or has_if else "LOW")
+    confidence = (
+        "HIGH" if has_case and has_if else ("MEDIUM" if has_case or has_if else "LOW")
+    )
     source_kind = "parsed+ai" if ai_enabled else "parsed"
 
     result = FlowExtractionResult(
@@ -77,7 +84,14 @@ def _extract_case_flow(source: str, result: FlowExtractionResult) -> None:
         return
 
     case_expr = case_match.group(1).strip()
-    result.nodes.append(FlowNode(node_id="start", label=f"Start {result.pou_name}", raw_condition=None, node_type="start"))
+    result.nodes.append(
+        FlowNode(
+            node_id="start",
+            label=f"Start {result.pou_name}",
+            raw_condition=None,
+            node_type="start",
+        )
+    )
 
     states: list[str] = []
     current_state: str | None = None
@@ -101,9 +115,18 @@ def _extract_case_flow(source: str, result: FlowExtractionResult) -> None:
 
         state_label = _STATE_LABEL_RE.match(stripped)
         if state_label and not stripped.upper().startswith(("IF ", "ELSE", "ELSIF")):
-            current_state = state_label.group(1)
-            states.append(current_state)
-            result.nodes.append(FlowNode(node_id=current_state, label=current_state, raw_condition=None, node_type="state"))
+            state_name = state_label.group(1)
+            if state_name:
+                current_state = state_name
+                states.append(state_name)
+                result.nodes.append(
+                    FlowNode(
+                        node_id=state_name,
+                        label=state_name,
+                        raw_condition=None,
+                        node_type="state",
+                    )
+                )
             current_conditions.clear()
             continue
 
@@ -124,17 +147,39 @@ def _extract_case_flow(source: str, result: FlowExtractionResult) -> None:
         assign_match = _STATE_ASSIGN_RE.search(stripped)
         if assign_match and current_state and current_conditions:
             target_state = assign_match.group(1)
-            result.edges.append(FlowEdge(source=current_state, target=target_state, label=current_conditions[-1]))
+            result.edges.append(
+                FlowEdge(
+                    source=current_state,
+                    target=target_state,
+                    label=current_conditions[-1],
+                )
+            )
             if target_state not in states:
                 states.append(target_state)
-                result.nodes.append(FlowNode(node_id=target_state, label=target_state, raw_condition=None, node_type="state"))
+                result.nodes.append(
+                    FlowNode(
+                        node_id=target_state,
+                        label=target_state,
+                        raw_condition=None,
+                        node_type="state",
+                    )
+                )
 
     if states:
-        result.edges.insert(0, FlowEdge(source="start", target=states[0], label=case_expr))
+        result.edges.insert(
+            0, FlowEdge(source="start", target=states[0], label=case_expr)
+        )
 
 
 def _extract_if_flow(source: str, result: FlowExtractionResult) -> None:
-    result.nodes.append(FlowNode(node_id="start", label=f"Start {result.pou_name}", raw_condition=None, node_type="start"))
+    result.nodes.append(
+        FlowNode(
+            node_id="start",
+            label=f"Start {result.pou_name}",
+            raw_condition=None,
+            node_type="start",
+        )
+    )
     current_branch = "start"
     branch_idx = 0
 
@@ -148,8 +193,17 @@ def _extract_if_flow(source: str, result: FlowExtractionResult) -> None:
             condition = if_match.group(1).strip()
             node_id = f"branch_{branch_idx}"
             branch_idx += 1
-            result.nodes.append(FlowNode(node_id=node_id, label=condition, raw_condition=condition, node_type="branch"))
-            result.edges.append(FlowEdge(source=current_branch, target=node_id, label=condition))
+            result.nodes.append(
+                FlowNode(
+                    node_id=node_id,
+                    label=condition,
+                    raw_condition=condition,
+                    node_type="branch",
+                )
+            )
+            result.edges.append(
+                FlowEdge(source=current_branch, target=node_id, label=condition)
+            )
             current_branch = node_id
             continue
 
@@ -157,16 +211,39 @@ def _extract_if_flow(source: str, result: FlowExtractionResult) -> None:
         if assign_match:
             target = assign_match.group(1)
             node_id = f"action_{branch_idx}"
-            result.nodes.append(FlowNode(node_id=node_id, label=f"State := {target}", raw_condition=None, node_type="action"))
-            result.edges.append(FlowEdge(source=current_branch, target=node_id, label="action"))
+            result.nodes.append(
+                FlowNode(
+                    node_id=node_id,
+                    label=f"State := {target}",
+                    raw_condition=None,
+                    node_type="action",
+                )
+            )
+            result.edges.append(
+                FlowEdge(source=current_branch, target=node_id, label="action")
+            )
             branch_idx += 1
 
 
 def _annotate_loops(source: str, result: FlowExtractionResult) -> None:
     if re.search(r"\bFOR\b", source, re.IGNORECASE):
-        result.nodes.append(FlowNode(node_id="loop_for", label="FOR loop", raw_condition=None, node_type="branch"))
+        result.nodes.append(
+            FlowNode(
+                node_id="loop_for",
+                label="FOR loop",
+                raw_condition=None,
+                node_type="branch",
+            )
+        )
     if re.search(r"\bWHILE\b", source, re.IGNORECASE):
-        result.nodes.append(FlowNode(node_id="loop_while", label="WHILE loop", raw_condition=None, node_type="branch"))
+        result.nodes.append(
+            FlowNode(
+                node_id="loop_while",
+                label="WHILE loop",
+                raw_condition=None,
+                node_type="branch",
+            )
+        )
 
 
 def _strip_comments(source: str) -> str:
