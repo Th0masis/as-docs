@@ -491,7 +491,9 @@ class CopilotProvider:
         last_exc: Exception | None = None
         for attempt in range(1, max_attempts + 1):
             try:
-                content = self._send_with_sdk(prompt=prompt, model=model, max_tokens=max_tokens)
+                content = self._send_with_sdk(
+                    prompt=prompt, model=model, max_tokens=max_tokens
+                )
                 raw_json = extract_json_block(content, provider_name="Copilot")
                 parsed = json.loads(raw_json)
                 return _normalize_payload(parsed)
@@ -560,7 +562,9 @@ class CopilotProvider:
         for fb_model in fallback_models:
             try:
                 _LOG.info("Trying fallback model '%s' via SDK.", fb_model)
-                content = self._send_with_sdk(prompt=prompt, model=fb_model, max_tokens=max_tokens)
+                content = self._send_with_sdk(
+                    prompt=prompt, model=fb_model, max_tokens=max_tokens
+                )
                 raw_json = extract_json_block(content, provider_name="Copilot")
                 parsed = json.loads(raw_json)
                 _LOG.info("Fallback model '%s' succeeded.", fb_model)
