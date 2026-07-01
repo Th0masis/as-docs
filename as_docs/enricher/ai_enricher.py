@@ -8,6 +8,7 @@ from as_docs.enricher.cache import CacheStats, EnrichmentCache
 from as_docs.enricher.prompts import build_level2_task_prompt, build_level3_pou_prompt
 from as_docs.enricher.providers import create_provider
 from as_docs.model.graph import KnowledgeGraph
+from as_docs.shared_helpers import task_rw_vars
 
 
 def enrich_graph(graph: KnowledgeGraph, level: int, config: Config) -> CacheStats:
@@ -40,7 +41,7 @@ def _enrich_tasks(
     stats: CacheStats,
 ) -> None:
     for task_name, task in sorted(graph.tasks.items()):
-        reads, writes = _task_rw_vars(graph, task.programs)
+        reads, writes = task_rw_vars(graph, task.programs)
         coupling_tasks = _task_coupling(graph, task_name, reads, writes)
         key_material = "\n".join(
             [
@@ -160,45 +161,13 @@ def _pou_rw_vars(graph: KnowledgeGraph, pou_name: str) -> tuple[list[str], list[
     return reads, writes
 
 
-def _task_rw_vars(graph: KnowledgeGraph, programs: list[str]) -> tuple[list[str], list[str]]:
-    pou_set = _task_pou_closure(graph, programs)
-    reads = sorted(
-        e.target
-        for e in graph.edges
-        if e.edge_type == "READS" and e.source in pou_set and e.target in graph.global_vars
-    )
-    writes = sorted(
-        e.target
-        for e in graph.edges
-        if e.edge_type == "WRITES" and e.source in pou_set and e.target in graph.global_vars
-    )
-    return reads, writes
-
-
 def _task_coupling(graph: KnowledgeGraph, task_name: str, reads: list[str], writes: list[str]) -> list[str]:
     vars_used = set(reads) | set(writes)
     coupling: list[str] = []
     for other_name, task in graph.tasks.items():
         if other_name == task_name:
             continue
-        other_reads, other_writes = _task_rw_vars(graph, task.programs)
+        other_reads, other_writes = task_rw_vars(graph, task.programs)
         if vars_used.intersection(other_reads) or vars_used.intersection(other_writes):
             coupling.append(other_name)
     return sorted(coupling)
-
-
-def _task_pou_closure(graph: KnowledgeGraph, programs: list[str]) -> set[str]:
-    closure = set(programs)
-    queue = list(programs)
-
-    while queue:
-        current = queue.pop(0)
-        children = [
-            e.target for e in graph.edges if e.edge_type == "CALLS" and e.source == current
-        ]
-        for child in children:
-            if child not in closure:
-                closure.add(child)
-                queue.append(child)
-
-    return closure

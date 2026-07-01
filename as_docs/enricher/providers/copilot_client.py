@@ -16,6 +16,7 @@ from typing import Any
 
 from as_docs.config import AIConfig
 from as_docs.enricher.providers.base import EnrichmentPayload
+from as_docs.shared_helpers import extract_json_block
 
 
 SYSTEM_INSTRUCTION = (
@@ -465,7 +466,7 @@ class CopilotProvider:
         for attempt in range(1, max_attempts + 1):
             try:
                 content = self._send_with_sdk(prompt=prompt, model=model, max_tokens=max_tokens)
-                raw_json = _extract_json_block(content)
+                raw_json = extract_json_block(content, provider_name="Copilot")
                 parsed = json.loads(raw_json)
                 return _normalize_payload(parsed)
             except (RuntimeError, TimeoutError, Exception) as exc:
@@ -522,7 +523,7 @@ class CopilotProvider:
             try:
                 _LOG.info("Trying fallback model '%s' via SDK.", fb_model)
                 content = self._send_with_sdk(prompt=prompt, model=fb_model, max_tokens=max_tokens)
-                raw_json = _extract_json_block(content)
+                raw_json = extract_json_block(content, provider_name="Copilot")
                 parsed = json.loads(raw_json)
                 _LOG.info("Fallback model '%s' succeeded.", fb_model)
                 return _normalize_payload(parsed)
@@ -595,7 +596,7 @@ class CopilotProvider:
                     ) from exc
             else:
                 raise
-        raw_json = _extract_json_block(content)
+        raw_json = extract_json_block(content, provider_name="Copilot")
         parsed = json.loads(raw_json)
         return _normalize_payload(parsed)
 
@@ -686,14 +687,6 @@ class CopilotProvider:
                 force_stop = getattr(client, "force_stop", None)
                 if callable(force_stop):
                     await force_stop()
-
-
-def _extract_json_block(text: str) -> str:
-    start = text.find("{")
-    end = text.rfind("}")
-    if start < 0 or end < 0 or end <= start:
-        raise RuntimeError("Copilot provider response does not contain a JSON object.")
-    return text[start : end + 1]
 
 
 def _is_sdk_not_installed_error(exc: Exception) -> bool:

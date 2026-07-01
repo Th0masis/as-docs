@@ -7,6 +7,7 @@ from typing import Any
 
 from as_docs.config import AIConfig
 from as_docs.enricher.providers.base import EnrichmentPayload
+from as_docs.shared_helpers import extract_json_block
 
 
 SYSTEM_INSTRUCTION = (
@@ -58,7 +59,7 @@ class AnthropicProvider:
                     timeout=float(self._cfg.timeout_seconds),
                 )
                 content = _extract_text_content(response)
-                raw_json = _extract_json_block(content)
+                raw_json = extract_json_block(content, provider_name="Anthropic")
                 parsed = json.loads(raw_json)
                 return _normalize_payload(parsed)
             except json.JSONDecodeError as exc:
@@ -89,14 +90,6 @@ def _extract_text_content(response: Any) -> str:
         raise RuntimeError("Anthropic provider response did not include text content.")
 
     return merged
-
-
-def _extract_json_block(text: str) -> str:
-    start = text.find("{")
-    end = text.rfind("}")
-    if start < 0 or end < 0 or end <= start:
-        raise RuntimeError("Anthropic provider response does not contain a JSON object.")
-    return text[start : end + 1]
 
 
 def _normalize_payload(data: dict[str, Any]) -> EnrichmentPayload:

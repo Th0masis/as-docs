@@ -6,6 +6,7 @@ from as_docs.model.graph import KnowledgeGraph
 from as_docs.analyzer.xref_builder import build_xrefs
 from as_docs.generator.diagram_gen import generate_architecture_diagram, generate_data_flow_diagram
 from as_docs.generator.flow_diagram_gen import generate_flow_markdown
+from as_docs.shared_helpers import task_rw_vars
 
 
 def generate_all_markdown(graph: KnowledgeGraph, output_dir: Path) -> list[Path]:
@@ -251,7 +252,7 @@ def _write_task_pages(graph: KnowledgeGraph, output_dir: Path) -> list[Path]:
     produced: list[Path] = []
 
     for task_name, task in sorted(graph.tasks.items()):
-        reads, writes = _task_rw_vars(graph, task.programs)
+        reads, writes = task_rw_vars(graph, task.programs)
         coupling = _task_coupling(graph, task_name, set(reads) | set(writes))
 
         path = tasks_dir / f"{task_name}.md"
@@ -289,42 +290,12 @@ def _write_task_pages(graph: KnowledgeGraph, output_dir: Path) -> list[Path]:
     return produced
 
 
-def _task_rw_vars(graph: KnowledgeGraph, programs: list[str]) -> tuple[list[str], list[str]]:
-    closure = _task_pou_closure(graph, programs)
-    reads = sorted(
-        e.target
-        for e in graph.edges
-        if e.edge_type == "READS" and e.source in closure and e.target in graph.global_vars
-    )
-    writes = sorted(
-        e.target
-        for e in graph.edges
-        if e.edge_type == "WRITES" and e.source in closure and e.target in graph.global_vars
-    )
-    return reads, writes
-
-
-def _task_pou_closure(graph: KnowledgeGraph, programs: list[str]) -> set[str]:
-    closure = set(programs)
-    queue = list(programs)
-    while queue:
-        current = queue.pop(0)
-        callees = [
-            e.target for e in graph.edges if e.edge_type == "CALLS" and e.source == current
-        ]
-        for callee in callees:
-            if callee not in closure:
-                closure.add(callee)
-                queue.append(callee)
-    return closure
-
-
 def _task_coupling(graph: KnowledgeGraph, task_name: str, var_set: set[str]) -> list[str]:
     coupled: list[str] = []
     for other_name, other in sorted(graph.tasks.items()):
         if other_name == task_name:
             continue
-        other_reads, other_writes = _task_rw_vars(graph, other.programs)
+        other_reads, other_writes = task_rw_vars(graph, other.programs)
         if var_set.intersection(other_reads) or var_set.intersection(other_writes):
             coupled.append(other_name)
     return coupled
