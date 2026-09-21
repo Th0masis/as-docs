@@ -1,7 +1,9 @@
 """Cross-reference builder — maps variables to the POUs that read/write them."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
+
 from as_docs.model.graph import Edge
 
 

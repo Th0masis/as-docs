@@ -1,6 +1,7 @@
 """Call graph builder — assembles POU call hierarchy from ST analysis results."""
 
 from __future__ import annotations
+
 from as_docs.analyzer.st_analyzer import STAnalysisResult
 from as_docs.model.graph import Edge
 from as_docs.model.project import ProjectModel

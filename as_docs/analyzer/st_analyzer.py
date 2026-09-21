@@ -16,6 +16,7 @@ B&R naming conventions used as deterministic heuristics:
 """
 
 from __future__ import annotations
+
 import re
 from dataclasses import dataclass, field
 
@@ -269,8 +270,29 @@ def _find_binding_prefixes(source: str, instance_names: set[str]) -> set[str]:
 
 def _is_primitive_type(name: str) -> bool:
     primitives = frozenset(
-        "BOOL INT UINT SINT USINT DINT UDINT LINT ULINT REAL LREAL "
-        "BYTE WORD DWORD LWORD STRING WSTRING TIME DATE DT TOD".split()
+        {
+            "BOOL",
+            "INT",
+            "UINT",
+            "SINT",
+            "USINT",
+            "DINT",
+            "UDINT",
+            "LINT",
+            "ULINT",
+            "REAL",
+            "LREAL",
+            "BYTE",
+            "WORD",
+            "DWORD",
+            "LWORD",
+            "STRING",
+            "WSTRING",
+            "TIME",
+            "DATE",
+            "DT",
+            "TOD",
+        }
     )
     return name.upper() in primitives
 

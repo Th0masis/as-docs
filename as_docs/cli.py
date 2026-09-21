@@ -1,6 +1,7 @@
 """Click CLI entry points for as-docs."""
 
 from __future__ import annotations
+
 import json
 import logging
 import sys
@@ -340,18 +341,15 @@ def as_cli_check(config_path: str | None) -> None:
     )
 
     as_cli_available = False
-    try:
-        if adapter.is_available():
-            click.echo("    as-cli is installed and accessible")
-            as_cli_available = True
-        else:
-            click.echo("    as-cli is not available")
-            click.echo("\n    Troubleshooting:")
-            click.echo("    - Ensure as-cli is installed")
-            click.echo("    - Check that as-cli is in your PATH")
-            click.echo("    - Try: as-cli --version")
-    except Exception as e:
-        click.echo(f"    Error checking availability: {e}")
+    if adapter.is_available():
+        click.echo("    as-cli is installed and accessible")
+        as_cli_available = True
+    else:
+        click.echo("    as-cli is not available")
+        click.echo("\n    Troubleshooting:")
+        click.echo("    - Ensure as-cli is installed")
+        click.echo("    - Check that as-cli is in your PATH")
+        click.echo("    - Try: as-cli --version")
 
     click.echo()
 
@@ -363,7 +361,7 @@ def as_cli_check(config_path: str | None) -> None:
             # This will auto-start daemon if needed
             adapter._ensure_daemon()
             click.echo("    Connected to daemon (or started new one)")
-        except Exception as e:
+        except AsCliError as e:
             click.echo(f"    Daemon issue: {e}")
             click.echo("    Note: This may be temporary; retry later")
 
@@ -390,7 +388,7 @@ def as_cli_check(config_path: str | None) -> None:
                     click.echo(f"    symbol_search: {len(symbols)} symbols found")
                 except AsCliError as e:
                     click.echo(f"    symbol_search failed: {e}")
-        except Exception as e:
+        except AsCliError as e:
             click.echo(f"    Error running commands: {e}")
 
         click.echo()
@@ -467,7 +465,7 @@ def upgrade(to_level: int, pou: str | None, config_path: str | None) -> None:
 @click.option("--config", "config_path", default=None, type=click.Path())
 def status(config_path: str | None) -> None:
     """Show current documentation level and per-POU freshness."""
-    from as_docs.engine import load_graph, get_staleness
+    from as_docs.engine import get_staleness, load_graph
 
     cfg = _load_cfg(config_path)
     graph = load_graph(cfg)
