@@ -91,8 +91,11 @@ def test_request_maps_generic_sdk_auth_exception_to_runtime_error(monkeypatch) -
 
     provider = CopilotProvider(cfg)
 
+    class FakeSdkAuthError(Exception):
+        pass
+
     def _boom(*_args, **_kwargs):
-        raise Exception(
+        raise FakeSdkAuthError(
             "Session error: Execution failed: Error: Session was not created with authentication info or custom provider"
         )
 

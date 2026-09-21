@@ -264,7 +264,7 @@ class TestDataConflictResolverPathMismatches:
             modules=[AsCliModule("Main", "lib/Main.prg", "program")]
         )
 
-        merged, report = resolver.merge(fs_pous, as_cli_data)
+        _, report = resolver.merge(fs_pous, as_cli_data)
 
         assert len(report.conflicts) == 1
         assert report.has_conflicts
@@ -291,7 +291,7 @@ class TestDataConflictResolverPathMismatches:
             ]
         )
 
-        merged, report = resolver.merge(fs_pous, as_cli_data)
+        _, report = resolver.merge(fs_pous, as_cli_data)
 
         assert len(report.conflicts) == 2
         path_mismatches = [
@@ -312,7 +312,7 @@ class TestDataConflictResolverTypeMismatches:
             modules=[AsCliModule("Main", "Main.prg", "function")]
         )
 
-        merged, report = resolver.merge(fs_pous, as_cli_data)
+        _, report = resolver.merge(fs_pous, as_cli_data)
 
         assert len(report.conflicts) == 1
         conflict = report.conflicts[0]
@@ -335,7 +335,7 @@ class TestDataConflictResolverTypeMismatches:
             ]
         )
 
-        merged, report = resolver.merge(fs_pous, as_cli_data)
+        _, report = resolver.merge(fs_pous, as_cli_data)
 
         # Main should have 2 conflicts (path + type), Helper should have none
         main_conflicts = [c for c in report.conflicts if c.pou_name == "Main"]
@@ -414,7 +414,7 @@ class TestDataConflictResolverMetadata:
 
         fs_pous = {"Old": MockPOU("Old", "Old.prg", "program")}
 
-        merged, report = resolver.merge(fs_pous, AsCliProjectData())
+        merged, _ = resolver.merge(fs_pous, AsCliProjectData())
 
         assert merged["Old"].metadata["source"] == "filesystem"
         assert "as_cli_verified" not in merged["Old"].metadata
@@ -427,7 +427,7 @@ class TestDataConflictResolverMetadata:
             modules=[AsCliModule("New", "New.prg", "program")]
         )
 
-        merged, report = resolver.merge({}, as_cli_data)
+        merged, _ = resolver.merge({}, as_cli_data)
 
         assert merged["New"]["metadata"]["source"] == "as_cli_only"
         assert merged["New"]["metadata"]["discovered_by_as_cli"] is True
@@ -441,7 +441,7 @@ class TestDataConflictResolverMetadata:
             modules=[AsCliModule("Main", "Main.prg", "program")]
         )
 
-        merged, report = resolver.merge(fs_pous, as_cli_data)
+        merged, _ = resolver.merge(fs_pous, as_cli_data)
 
         assert merged["Main"].metadata["source"] == "both"
         assert merged["Main"].metadata["as_cli_verified"] is True
