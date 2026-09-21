@@ -13,6 +13,7 @@ from as_docs.engine import (
     run_generate,
 )
 from as_docs.model.project import ProjectModel
+from as_docs.scanner.as_cli_adapter import AsCliError
 from as_docs.scanner.as_cli_models import AsCliModule, AsCliProjectData
 from as_docs.scanner.data_conflict_resolver import Conflict, ConflictReport
 
@@ -202,7 +203,7 @@ class TestMergeAsCliDataStrictMode:
             mock_adapter.is_available.return_value = False
 
             # Should raise error
-            with pytest.raises(Exception):
+            with pytest.raises(AsCliError):
                 _merge_as_cli_data(model, config, Path("."))
 
     def test_strict_mode_raises_on_adapter_error(self):
@@ -221,10 +222,10 @@ class TestMergeAsCliDataStrictMode:
             mock_adapter = MagicMock()
             MockAdapter.return_value = mock_adapter
             mock_adapter.is_available.return_value = True
-            mock_adapter.scan_project.side_effect = Exception("Adapter failed")
+            mock_adapter.scan_project.side_effect = RuntimeError("Adapter failed")
 
             # Should raise error
-            with pytest.raises(Exception):
+            with pytest.raises(RuntimeError):
                 _merge_as_cli_data(model, config, Path("."))
 
 

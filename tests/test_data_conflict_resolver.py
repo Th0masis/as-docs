@@ -396,7 +396,7 @@ class TestDataConflictResolverSmartUnion:
             modules=[AsCliModule("Main", "lib/Main.prg", "function")]
         )
 
-        merged, report = resolver.merge(fs_pous, as_cli_data)
+        merged, _ = resolver.merge(fs_pous, as_cli_data)
 
         # Merged POU should have as-cli values
         main_pou = merged["Main"]
