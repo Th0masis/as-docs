@@ -3,7 +3,10 @@ from __future__ import annotations
 import json
 import os
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from anthropic.types import MessageParam
 
 from as_docs.config import AIConfig
 from as_docs.enricher.providers.base import EnrichmentPayload
@@ -48,15 +51,15 @@ class AnthropicProvider:
 
     def _request(self, prompt: str, model: str, max_tokens: int) -> EnrichmentPayload:
         max_attempts = self._cfg.max_retries + 1
+        messages: list[MessageParam] = [{"role": "user", "content": prompt}]
 
         for attempt in range(1, max_attempts + 1):
             try:
                 response = self._client.messages.create(
                     model=model,
                     max_tokens=max_tokens,
-                    temperature=0,
                     system=SYSTEM_INSTRUCTION,
-                    messages=[{"role": "user", "content": prompt}],
+                    messages=messages,
                     timeout=float(self._cfg.timeout_seconds),
                 )
                 content = _extract_text_content(response)
