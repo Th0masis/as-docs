@@ -1,6 +1,7 @@
 from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 
 @dataclass
@@ -103,3 +104,6 @@ class KnowledgeGraph:
     data_types: dict[str, DataType]
     edges: list[Edge]
     flow_diagrams: dict[str, FlowDiagram]  # keyed by POU name, Level 4 only
+    _ai_stats: Any = field(default=None, repr=False)
+    _regen_meta: dict[str, Any] = field(default_factory=dict, repr=False)
+    _scoped_fallback_full: bool = field(default=False, repr=False)

@@ -1,11 +1,12 @@
 """Tests for CLI updates with as-cli integration."""
 
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
 from click.testing import CliRunner
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 
-from as_docs.cli import generate, as_cli_check
+from as_docs.cli import as_cli_check, generate
 
 
 @pytest.fixture

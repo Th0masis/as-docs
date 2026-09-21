@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from as_docs.model.graph import KnowledgeGraph, TaskConfig, POUNode
+from as_docs.model.graph import KnowledgeGraph, POUNode, TaskConfig
 
 
 def build_level2_task_prompt(

@@ -1,6 +1,7 @@
 """Parser for .typ files — extracts STRUCT, ENUM, and ALIAS definitions."""
 
 from __future__ import annotations
+
 import re
 from pathlib import Path
 

@@ -1,28 +1,29 @@
 """Core engine — orchestrates scan → analyze → generate pipeline."""
 
 from __future__ import annotations
-from datetime import datetime, timezone
+
+import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
-import logging
 from typing import TYPE_CHECKING
 
+from as_docs.analyzer.call_graph import build_edges
+from as_docs.analyzer.st_analyzer import STAnalysisResult, analyze_st
 from as_docs.config import Config
+from as_docs.generator.flow_diagram_gen import build_flow_diagram
+from as_docs.generator.json_gen import generate_json
+from as_docs.generator.llms_txt_gen import generate_llms_txt
+from as_docs.generator.markdown_gen import generate_all_markdown
 from as_docs.model.graph import (
     SCHEMA_VERSION,
     Edge,
     KnowledgeGraph,
 )
 from as_docs.model.project import ProjectModel
-from as_docs.scanner.project_scanner import scan_project
-from as_docs.analyzer.st_analyzer import analyze_st, STAnalysisResult
-from as_docs.analyzer.call_graph import build_edges
-from as_docs.generator.json_gen import generate_json
-from as_docs.generator.flow_diagram_gen import build_flow_diagram
-from as_docs.generator.markdown_gen import generate_all_markdown
-from as_docs.generator.llms_txt_gen import generate_llms_txt
 from as_docs.scanner.as_cli_adapter import AsCliAdapter, AsCliError
 from as_docs.scanner.data_conflict_resolver import DataConflictResolver
+from as_docs.scanner.project_scanner import scan_project
 
 if TYPE_CHECKING:
     from as_docs.scanner.data_conflict_resolver import ConflictReport
@@ -84,7 +85,7 @@ def run_generate(
         ai_stats = enrich_graph(
             graph, level=level, config=config, project_root=project_root
         )
-        setattr(graph, "_ai_stats", ai_stats)
+        graph._ai_stats = ai_stats
 
     if level >= 4:
         _populate_flow_diagrams(
@@ -116,20 +117,14 @@ def run_generate(
     if conflict_report is not None:
         _save_conflict_report(conflict_report, output_dir)
 
-    setattr(
-        graph,
-        "_regen_meta",
-        {
-            "scope": scope,
-            "touched_pous": touched_pous,
-            "elapsed_seconds": round(perf_counter() - started, 3),
-            "scanned_pous": len(model.pous),
-            "fallback_full": bool(getattr(graph, "_scoped_fallback_full", False)),
-            "as_cli_merge_report": conflict_report.to_dict()
-            if conflict_report
-            else None,
-        },
-    )
+    graph._regen_meta = {
+        "scope": scope,
+        "touched_pous": touched_pous,
+        "elapsed_seconds": round(perf_counter() - started, 3),
+        "scanned_pous": len(model.pous),
+        "fallback_full": bool(getattr(graph, "_scoped_fallback_full", False)),
+        "as_cli_merge_report": conflict_report.to_dict() if conflict_report else None,
+    }
 
     return graph
 
@@ -229,7 +224,7 @@ def _save_conflict_report(conflict_report: ConflictReport, output_dir: Path) -> 
 
         logger.info(f"Conflict report saved to {report_file}")
 
-    except Exception as e:
+    except OSError as e:
         logger.warning(f"Failed to save conflict report: {e}")
 
 
@@ -288,7 +283,7 @@ def _build_full_graph(
         schema_version=SCHEMA_VERSION,
         project_name=model.project_name,
         as_version=model.as_version,
-        generated_at=datetime.now(timezone.utc).isoformat(),
+        generated_at=datetime.now(UTC).isoformat(),
         level=level,
         active_configuration=model.active_configuration,
         pous=model.pous,
@@ -310,13 +305,13 @@ def _build_scoped_graph(
     prev = load_graph(config)
     if prev is None:
         graph = _build_full_graph(model, config=config, level=level)
-        setattr(graph, "_scoped_fallback_full", True)
+        graph._scoped_fallback_full = True
         return graph
 
     prev.project_name = model.project_name
     prev.as_version = model.as_version
     prev.active_configuration = model.active_configuration
-    prev.generated_at = datetime.now(timezone.utc).isoformat()
+    prev.generated_at = datetime.now(UTC).isoformat()
     prev.level = level
     prev.tasks = model.tasks
     prev.global_vars = model.global_vars

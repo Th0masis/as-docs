@@ -1,9 +1,10 @@
 """Data models for as-cli integration."""
 
 from __future__ import annotations
-from dataclasses import dataclass, field, asdict
-from typing import Any, Optional
+
 import json
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -37,7 +38,7 @@ class AsCliSymbol:
     scope: str
     """Full scope path (e.g., 'modules.main.main')."""
 
-    module: Optional[str] = None
+    module: str | None = None
     """Module/scope containing this symbol."""
 
     def to_dict(self) -> dict[str, Any]:
@@ -58,13 +59,13 @@ class AsCliProjectData:
     symbols: dict[str, AsCliSymbol] = field(default_factory=dict)
     """Dictionary of symbols from as-cli symbol_search (name -> symbol)."""
 
-    raw_logical_list: Optional[dict] = None
+    raw_logical_list: dict | None = None
     """Raw JSON output from as-cli logical list (for debugging/inspection)."""
 
-    raw_symbol_search: Optional[dict] = None
+    raw_symbol_search: dict | None = None
     """Raw JSON output from as-cli symbol search (for debugging/inspection)."""
 
-    project_path: Optional[str] = None
+    project_path: str | None = None
     """Path to the AS project that was scanned."""
 
     execution_time_ms: float = 0.0

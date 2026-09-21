@@ -5,11 +5,12 @@ using a smart union strategy, detects conflicts, and generates a detailed report
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field, asdict
-from datetime import datetime
-from typing import Any, Optional
+
 import json
 import logging
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from typing import Any
 
 from .as_cli_models import AsCliProjectData
 
@@ -26,10 +27,10 @@ class Conflict:
     pou_name: str
     """Name of the POU with conflict."""
 
-    fs_value: Optional[str] = None
+    fs_value: str | None = None
     """Value from filesystem source."""
 
-    as_cli_value: Optional[str] = None
+    as_cli_value: str | None = None
     """Value from as-cli source."""
 
     severity: str = "warning"
@@ -65,7 +66,7 @@ class ConflictReport:
     agreed_pous: list[str] = field(default_factory=list)
     """POUs where both sources agree."""
 
-    merge_timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    merge_timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     """ISO 8601 timestamp of merge."""
 
     @property
@@ -156,9 +157,9 @@ class DataConflictResolver:
             ValueError: If input data is invalid
         """
         if not isinstance(fs_pous, dict):
-            raise ValueError("fs_pous must be a dictionary")
+            raise TypeError("fs_pous must be a dictionary")
         if not isinstance(as_cli_data, AsCliProjectData):
-            raise ValueError("as_cli_data must be AsCliProjectData instance")
+            raise TypeError("as_cli_data must be AsCliProjectData instance")
 
         merged_pous = {}
         conflicts = []
@@ -173,9 +174,7 @@ class DataConflictResolver:
             merged_pous[pou_name] = pou
 
             # Add metadata tracking source
-            if not hasattr(pou, "metadata"):
-                pou.metadata = {}
-            elif pou.metadata is None:
+            if not hasattr(pou, "metadata") or pou.metadata is None:
                 pou.metadata = {}
 
             pou.metadata["source"] = "filesystem"
@@ -252,7 +251,7 @@ class DataConflictResolver:
                 as_cli_only_pous.append(pou_name)
 
         # Step 3: Identify fs-only POUs
-        for pou_name in fs_pous.keys():
+        for pou_name in fs_pous:
             if pou_name not in agreed_pous and pou_name not in as_cli_only_pous:
                 fs_only_pous.append(pou_name)
                 self.logger.debug(f"POU {pou_name} found only in filesystem")
@@ -266,7 +265,7 @@ class DataConflictResolver:
             fs_only_pous=sorted(fs_only_pous),
             as_cli_only_pous=sorted(as_cli_only_pous),
             agreed_pous=sorted(agreed_pous),
-            merge_timestamp=datetime.now().isoformat(),
+            merge_timestamp=datetime.now(UTC).isoformat(),
         )
 
         # Step 5: Log summary

@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 
 from as_docs.model.graph import FlowNode
 
-
 _STATE_LABEL_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*$")
 _CASE_RE = re.compile(r"\bCASE\s+(.+?)\s+OF\b", re.IGNORECASE)
 _IF_RE = re.compile(r"\bIF\s+(.+?)\s+THEN\b", re.IGNORECASE)

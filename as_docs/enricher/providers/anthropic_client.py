@@ -9,7 +9,6 @@ from as_docs.config import AIConfig
 from as_docs.enricher.providers.base import EnrichmentPayload
 from as_docs.shared_helpers import extract_json_block
 
-
 SYSTEM_INSTRUCTION = (
     "You are a documentation assistant for B&R Automation Studio projects. "
     "Return strict JSON only with keys: description, responsibilities, patterns, notes."
@@ -107,7 +106,7 @@ def _normalize_payload(data: dict[str, Any]) -> EnrichmentPayload:
 
     responsibilities = data.get("responsibilities", [])
     if not isinstance(responsibilities, list):
-        raise RuntimeError(
+        raise TypeError(
             "Anthropic provider response field 'responsibilities' must be an array."
         )
 

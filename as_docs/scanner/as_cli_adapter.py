@@ -10,12 +10,11 @@ It handles:
 """
 
 from __future__ import annotations
+
 import json
 import logging
 import subprocess
-from typing import Optional
 import time
-
 from .as_cli_models import (
     AsCliProjectData,
     parse_logical_list_output,
@@ -31,31 +30,21 @@ logger = logging.getLogger(__name__)
 class AsCliError(Exception):
     """Base exception for all as-cli integration errors."""
 
-    pass
-
 
 class AsCliNotAvailableError(AsCliError):
     """as-cli executable not found or not available."""
-
-    pass
 
 
 class AsCliCommandError(AsCliError):
     """as-cli command returned non-zero exit code."""
 
-    pass
-
 
 class AsCliTimeoutError(AsCliError):
     """as-cli command timed out."""
 
-    pass
-
 
 class AsCliParseError(AsCliError):
     """Failed to parse as-cli JSON output."""
-
-    pass
 
 
 # Main Adapter
@@ -75,7 +64,7 @@ class AsCliAdapter:
     def __init__(
         self,
         as_cli_path: str = "as-cli",
-        project_path: Optional[str] = None,
+        project_path: str | None = None,
         timeout_ms: int = 30000,
     ):
         """
@@ -110,11 +99,12 @@ class AsCliAdapter:
                 timeout=5,
                 capture_output=True,
                 text=True,
+                check=False,
             )
             is_available = result.returncode == 0
             logger.debug(f"as-cli availability check: {is_available}")
             return is_available
-        except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
+        except (OSError, subprocess.TimeoutExpired) as e:
             logger.debug(f"as-cli not available: {e}")
             return False
 
@@ -178,7 +168,7 @@ class AsCliAdapter:
             raise AsCliTimeoutError(
                 f"as-cli daemon startup timed out ({self.timeout_ms}ms)"
             )
-        except Exception as e:
+        except OSError as e:
             raise AsCliNotAvailableError(f"Failed to start as-cli daemon: {e}")
 
     def get_logical_list(self) -> dict:

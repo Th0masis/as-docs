@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from as_docs.config import Config
-from as_docs.enricher.ai_enricher import enrich_graph
 from as_docs.engine import run_generate
+from as_docs.enricher.ai_enricher import enrich_graph
 from as_docs.model.graph import Edge, KnowledgeGraph, POUNode, TaskConfig, Variable
 
 

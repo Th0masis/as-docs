@@ -1,17 +1,18 @@
 """Tests for as-cli adapter (command execution, daemon management, parsing)."""
 
-import pytest
-from unittest.mock import Mock, patch
 import json
 import subprocess
+from unittest.mock import Mock, patch
+
+import pytest
 
 from as_docs.scanner.as_cli_adapter import (
     AsCliAdapter,
+    AsCliCommandError,
     AsCliError,
     AsCliNotAvailableError,
-    AsCliTimeoutError,
-    AsCliCommandError,
     AsCliParseError,
+    AsCliTimeoutError,
 )
 from as_docs.scanner.as_cli_models import (
     AsCliProjectData,

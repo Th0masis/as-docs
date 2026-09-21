@@ -526,7 +526,7 @@ def upgrade_payload(
 
 def _register_tool(server: Any, fn: Any, *, name: str, description: str) -> None:
     if hasattr(server, "tool"):
-        tool_attr = getattr(server, "tool")
+        tool_attr = server.tool
         # FastMCP supports decorator style. Keep this tolerant to minor API variants.
         for kwargs in (
             {"name": name, "description": description},
@@ -541,7 +541,7 @@ def _register_tool(server: Any, fn: Any, *, name: str, description: str) -> None
                 continue
 
     if hasattr(server, "add_tool"):
-        add_tool = getattr(server, "add_tool")
+        add_tool = server.add_tool
         for kwargs in (
             {"name": name, "description": description},
             {"name": name},
@@ -562,7 +562,7 @@ def _run_server(server: Any, config: Config, *, use_http: bool, port: int) -> No
         resolved_port = int(port or config.server.port)
 
         if hasattr(server, "run"):
-            run_method = getattr(server, "run")
+            run_method = server.run
             for kwargs in (
                 {"transport": "http", "host": host, "port": resolved_port},
                 {"transport": "streamable-http", "host": host, "port": resolved_port},
@@ -575,13 +575,13 @@ def _run_server(server: Any, config: Config, *, use_http: bool, port: int) -> No
                     continue
 
         if hasattr(server, "run_http"):
-            getattr(server, "run_http")(host=host, port=resolved_port)
+            server.run_http(host=host, port=resolved_port)
             return
 
         raise RuntimeError("Unsupported FastMCP API: HTTP transport is unavailable.")
 
     if hasattr(server, "run"):
-        run_method = getattr(server, "run")
+        run_method = server.run
         for kwargs in ({"transport": "stdio"}, {}):
             try:
                 run_method(**kwargs)

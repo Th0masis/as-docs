@@ -18,7 +18,6 @@ from as_docs.config import AIConfig
 from as_docs.enricher.providers.base import EnrichmentPayload
 from as_docs.shared_helpers import extract_json_block
 
-
 SYSTEM_INSTRUCTION = (
     "You are a documentation assistant for B&R Automation Studio projects. "
     "Return strict JSON only with keys: description, responsibilities, patterns, notes."
@@ -101,7 +100,7 @@ def _resolve_vscode_token_windows() -> str | None:
                         return tok
         finally:
             advapi32.CredFree(pcred)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - credential discovery is best effort
         _LOG.debug("Windows Credential Manager read failed: %s", exc)
     return None
 
@@ -115,6 +114,7 @@ def _resolve_git_credential_token() -> str | None:
             capture_output=True,
             text=True,
             timeout=5,
+            check=False,
         )
         if result.returncode != 0:
             return None
@@ -185,9 +185,9 @@ def _resolve_github_token_via_device_flow(client_id: str) -> str | None:
             headers={"Content-Type": "application/json", "Accept": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - device flow request is best effort
         _LOG.debug("Device flow code request failed: %s", exc)
         return None
 
@@ -229,9 +229,9 @@ def _resolve_github_token_via_device_flow(client_id: str) -> str | None:
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+            with urllib.request.urlopen(req, timeout=10) as resp:
                 result = json.loads(resp.read())
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - device flow polling must retry
             _LOG.debug("Device flow poll failed: %s", exc)
             continue
 
@@ -291,6 +291,7 @@ def _resolve_github_token_with_source(
             capture_output=True,
             text=True,
             timeout=5,
+            check=False,
         )
         if result.returncode == 0:
             tok = result.stdout.strip()
@@ -350,7 +351,7 @@ def _verify_copilot_entitlement(token: str) -> str:
     # Step 1: resolve the GitHub login.
     try:
         req = urllib.request.Request(f"{_GH_API}/user", headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=10) as resp:
             user_data = json.loads(resp.read())
         login: str = user_data.get("login") or "<unknown>"
     except urllib.error.HTTPError as exc:
@@ -366,7 +367,7 @@ def _verify_copilot_entitlement(token: str) -> str:
     # Step 2: verify Copilot entitlement via the internal token endpoint.
     try:
         req = urllib.request.Request(_COPILOT_TOKEN_URL, headers=headers)
-        urllib.request.urlopen(req, timeout=10).close()  # noqa: S310
+        urllib.request.urlopen(req, timeout=10).close()
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403, 422):
             raise RuntimeError(
@@ -375,8 +376,8 @@ def _verify_copilot_entitlement(token: str) -> str:
             ) from exc
         # Unexpected HTTP error – treat as a transient network issue, not a hard block.
         # Log and continue; the SDK itself will surface a cleaner error if Copilot is unavailable.
-    except Exception:
-        pass  # Network failure during entitlement probe — let the SDK handle it.
+    except Exception as exc:  # noqa: BLE001 - SDK remains the source of truth
+        _LOG.debug("Copilot entitlement probe failed: %s", exc)
 
     return login
 
@@ -390,7 +391,7 @@ def _get_copilot_api_token(github_token: str) -> str:
     }
     try:
         req = urllib.request.Request(_COPILOT_TOKEN_URL, headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
         token = data.get("token", "")
         if not token:
@@ -436,7 +437,7 @@ def _send_via_copilot_http(
         req = urllib.request.Request(
             _COPILOT_CHAT_URL, data=body, headers=headers, method="POST"
         )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             result = json.loads(resp.read())
         content = result["choices"][0]["message"]["content"]
         if not content:
@@ -464,7 +465,7 @@ class CopilotProvider:
         if token:
             try:
                 self._github_login = _verify_copilot_entitlement(token)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - SDK errors need fallback handling
                 _LOG.info(
                     "Copilot preflight check inconclusive; continuing with SDK auth."
                 )
@@ -569,7 +570,7 @@ class CopilotProvider:
                 parsed = json.loads(raw_json)
                 _LOG.info("Fallback model '%s' succeeded.", fb_model)
                 return _normalize_payload(parsed)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - SDK errors need fallback handling
                 if _is_sdk_model_error(exc):
                     _LOG.warning(
                         "Fallback model '%s' also unavailable; trying next.", fb_model
@@ -740,11 +741,12 @@ class CopilotProvider:
             if session is not None:
                 try:
                     await session.disconnect()
-                except Exception:
-                    pass
+                except Exception as exc:  # noqa: BLE001 - cleanup must not mask the result
+                    _LOG.debug("Copilot session disconnect failed: %s", exc)
             try:
                 await client.stop()
-            except Exception:
+            except Exception as exc:  # noqa: BLE001 - cleanup must not mask the result
+                _LOG.debug("Copilot client stop failed: %s", exc)
                 force_stop = getattr(client, "force_stop", None)
                 if callable(force_stop):
                     result = force_stop()
@@ -802,7 +804,7 @@ def _normalize_payload(data: dict[str, Any]) -> EnrichmentPayload:
 
     responsibilities = data.get("responsibilities", [])
     if not isinstance(responsibilities, list):
-        raise RuntimeError(
+        raise TypeError(
             "Copilot provider response field 'responsibilities' must be an array."
         )
 

@@ -1,6 +1,7 @@
 """Configuration loader for .as-docs.yaml."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -197,7 +198,7 @@ def _validate_as_cli_config(as_cli_cfg: AsCliConfig) -> None:
         raise ValueError("Invalid as_cli.path: value must not be empty.")
 
     if not isinstance(as_cli_cfg.use_commands, list):
-        raise ValueError("Invalid as_cli.use_commands: value must be a list.")
+        raise TypeError("Invalid as_cli.use_commands: value must be a list.")
 
     valid_commands = {"logical_list", "symbol_search"}
     for cmd in as_cli_cfg.use_commands:

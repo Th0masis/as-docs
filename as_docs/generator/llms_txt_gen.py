@@ -1,6 +1,7 @@
 """llms.txt index generator — AI agent entry point."""
 
 from __future__ import annotations
+
 from pathlib import Path
 
 from as_docs.model.graph import KnowledgeGraph

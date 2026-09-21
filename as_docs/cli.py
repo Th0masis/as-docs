@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 import click
-from git import InvalidGitRepositoryError, Repo
+from git import GitCommandError, InvalidGitRepositoryError, Repo
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
@@ -646,12 +646,11 @@ def install_hook(yes: bool, force: bool, config_path: str | None) -> None:
     hooks_dir.mkdir(parents=True, exist_ok=True)
     hook_file = hooks_dir / "post-commit"
 
-    if not yes:
-        if not click.confirm(
-            f"Install as-docs post-commit hook in {hook_file}?", default=True
-        ):
-            click.echo("Hook installation cancelled.")
-            return
+    if not yes and not click.confirm(
+        f"Install as-docs post-commit hook in {hook_file}?", default=True
+    ):
+        click.echo("Hook installation cancelled.")
+        return
 
     marker_start = "# >>> as-docs hook start >>>"
     marker_end = "# <<< as-docs hook end <<<"
@@ -706,7 +705,7 @@ def diff(ref: str, config_path: str | None) -> None:
     repo_root = Path(repo.working_tree_dir or project_root)
     try:
         changed = _git_changed_files(repo, ref)
-    except Exception as exc:
+    except (GitCommandError, ValueError) as exc:
         click.echo(f"ERROR: Unable to diff ref '{ref}': {exc}", err=True)
         sys.exit(1)
 
@@ -892,11 +891,10 @@ def _merge_hook_block(
         )
         return merged, True
 
-    if has_start or has_end:
-        if not force:
-            raise click.ClickException(
-                "Found partial as-docs hook markers. Re-run with --force to replace."
-            )
+    if (has_start or has_end) and not force:
+        raise click.ClickException(
+            "Found partial as-docs hook markers. Re-run with --force to replace."
+        )
 
     base = existing.rstrip("\n")
     merged = (base + "\n\n" + block).strip("\n") + "\n"

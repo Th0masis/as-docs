@@ -1,7 +1,9 @@
 """Mermaid structural diagram generator."""
 
 from __future__ import annotations
+
 import re
+
 from as_docs.model.graph import KnowledgeGraph
 
 

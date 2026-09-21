@@ -1,15 +1,16 @@
 """Markdown generator — produces overview.md, architecture.md, global_vars.md, data_types.md."""
 
 from __future__ import annotations
+
 from pathlib import Path
 
-from as_docs.model.graph import KnowledgeGraph
 from as_docs.analyzer.xref_builder import build_xrefs
 from as_docs.generator.diagram_gen import (
     generate_architecture_diagram,
     generate_data_flow_diagram,
 )
 from as_docs.generator.flow_diagram_gen import generate_flow_markdown
+from as_docs.model.graph import KnowledgeGraph
 from as_docs.shared_helpers import task_rw_vars
 
 

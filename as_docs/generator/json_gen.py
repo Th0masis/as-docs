@@ -1,6 +1,7 @@
 """JSON generator — serializes KnowledgeGraph to knowledge_graph.json."""
 
 from __future__ import annotations
+
 import dataclasses
 import json
 from pathlib import Path

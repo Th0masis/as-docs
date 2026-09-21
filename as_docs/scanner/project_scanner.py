@@ -1,21 +1,22 @@
 """Project scanner — walks the AS project directory tree and discovers files."""
 
 from __future__ import annotations
+
 import logging
 from pathlib import Path
 
 from as_docs.config import Config, find_project_root
 from as_docs.model.graph import POUNode
 from as_docs.model.project import ProjectModel, RawSTFile
+from as_docs.scanner.per_parser import parse_per_file
 from as_docs.scanner.pkg_parser import (
-    parse_pkg,
-    parse_as6_package_objects,
     _AS6_OBJ_TYPE_MAP,
     _AS6_PKG_MARKER,
+    parse_as6_package_objects,
+    parse_pkg,
 )
-from as_docs.scanner.var_parser import parse_var_file
 from as_docs.scanner.typ_parser import parse_typ_file
-from as_docs.scanner.per_parser import parse_per_file
+from as_docs.scanner.var_parser import parse_var_file
 
 logger = logging.getLogger(__name__)
 
@@ -111,9 +112,12 @@ def _scan_logical(
             continue
 
         # Handle Libraries/ separately
-        if libraries_dir.is_dir() and _is_under(path, libraries_dir):
-            if not config.scanner.scan_libraries:
-                continue
+        if (
+            libraries_dir.is_dir()
+            and _is_under(path, libraries_dir)
+            and not config.scanner.scan_libraries
+        ):
+            continue
 
         suffix = path.suffix.lower()
 

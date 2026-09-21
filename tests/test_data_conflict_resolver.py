@@ -2,14 +2,14 @@
 
 import pytest
 
+from as_docs.scanner.as_cli_models import (
+    AsCliModule,
+    AsCliProjectData,
+)
 from as_docs.scanner.data_conflict_resolver import (
     Conflict,
     ConflictReport,
     DataConflictResolver,
-)
-from as_docs.scanner.as_cli_models import (
-    AsCliProjectData,
-    AsCliModule,
 )
 
 
@@ -167,14 +167,14 @@ class TestDataConflictResolverBasics:
         resolver = DataConflictResolver()
         as_cli_data = AsCliProjectData()
 
-        with pytest.raises(ValueError, match="fs_pous must be"):
+        with pytest.raises(TypeError, match="fs_pous must be"):
             resolver.merge("not a dict", as_cli_data)
 
     def test_merge_invalid_as_cli_data(self):
         """Test merge with invalid as-cli data."""
         resolver = DataConflictResolver()
 
-        with pytest.raises(ValueError, match="as_cli_data must be"):
+        with pytest.raises(TypeError, match="as_cli_data must be"):
             resolver.merge({}, "not AsCliProjectData")
 
 

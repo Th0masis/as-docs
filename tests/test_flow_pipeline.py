@@ -4,8 +4,8 @@ from pathlib import Path
 
 from as_docs.config import Config, OutputConfig, ScannerConfig
 from as_docs.engine import load_graph, run_generate
-from as_docs.mcp_server import get_flow_diagram_payload
 from as_docs.generator.flow_diagram_gen import build_flow_diagram
+from as_docs.mcp_server import get_flow_diagram_payload
 
 FIXTURE = Path(__file__).parent / "fixtures" / "SampleProject"
 

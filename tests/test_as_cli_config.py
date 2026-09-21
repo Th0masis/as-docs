@@ -1,11 +1,12 @@
 """Tests for as-cli configuration loading and validation."""
 
 import pytest
+
 from as_docs.config import (
-    Config,
     AsCliConfig,
-    load_config,
+    Config,
     _validate_as_cli_config,
+    load_config,
 )
 
 
@@ -76,7 +77,7 @@ class TestAsCliConfigValidation:
     def test_validate_use_commands_not_list_fails(self):
         """Invalid config: use_commands is not a list."""
         cfg = AsCliConfig(use_commands="logical_list")  # type: ignore
-        with pytest.raises(ValueError, match="use_commands.*list"):
+        with pytest.raises(TypeError, match="use_commands.*list"):
             _validate_as_cli_config(cfg)
 
     def test_validate_use_commands_valid(self):

@@ -1,19 +1,20 @@
 """Tests for engine integration with as-cli."""
 
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-from as_docs.config import Config, AsCliConfig, OutputConfig
+import pytest
+
+from as_docs.config import AsCliConfig, Config, OutputConfig
 from as_docs.engine import (
-    _should_use_as_cli,
     _merge_as_cli_data,
     _save_conflict_report,
+    _should_use_as_cli,
     run_generate,
 )
 from as_docs.model.project import ProjectModel
-from as_docs.scanner.as_cli_models import AsCliProjectData, AsCliModule
-from as_docs.scanner.data_conflict_resolver import ConflictReport, Conflict
+from as_docs.scanner.as_cli_models import AsCliModule, AsCliProjectData
+from as_docs.scanner.data_conflict_resolver import Conflict, ConflictReport
 
 
 class MockPOU:

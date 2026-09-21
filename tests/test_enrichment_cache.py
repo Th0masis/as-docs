@@ -5,7 +5,6 @@ from pathlib import Path
 from as_docs.enricher.cache import EnrichmentCache
 from as_docs.enricher.providers.base import EnrichmentPayload
 
-
 CONTENT = "PROGRAM Demo\nA := B;"
 
 

@@ -1,6 +1,7 @@
 """Tests for nested package (AS6 recursive) scanning."""
 
 from __future__ import annotations
+
 from pathlib import Path
 
 NESTED = Path(__file__).parent / "fixtures" / "NestedProject"
@@ -89,7 +90,7 @@ class TestParsePkgAs6:
 
 class TestNestedPackageScanning:
     def _scan(self, project_root=NESTED):
-        from as_docs.config import Config, ScannerConfig, ProjectConfig
+        from as_docs.config import Config, ProjectConfig, ScannerConfig
         from as_docs.scanner.project_scanner import scan_project
 
         config = Config(
@@ -130,7 +131,7 @@ class TestNestedPackageScanning:
         assert top.package_path == ""
 
     def test_recursive_packages_false_disables_tree_scan(self):
-        from as_docs.config import Config, ScannerConfig, ProjectConfig
+        from as_docs.config import Config, ProjectConfig, ScannerConfig
         from as_docs.scanner.project_scanner import scan_project
 
         config = Config(
@@ -144,7 +145,7 @@ class TestNestedPackageScanning:
 
     def test_backward_compat_sample_project(self):
         """AS4-format SampleProject should still scan correctly."""
-        from as_docs.config import Config, ScannerConfig, ProjectConfig
+        from as_docs.config import Config, ProjectConfig, ScannerConfig
         from as_docs.scanner.project_scanner import scan_project
 
         config = Config(
@@ -159,7 +160,7 @@ class TestNestedPackageScanning:
 class TestCircularReferenceDetection:
     def test_circular_reference_does_not_hang(self, tmp_path):
         """Scanner must not infinite-loop when Package.pkg files form a cycle."""
-        from as_docs.config import Config, ScannerConfig, ProjectConfig
+        from as_docs.config import Config, ProjectConfig, ScannerConfig
         from as_docs.scanner.project_scanner import scan_project
 
         # Build: Logical/Package.pkg → PkgA → (Package.pkg references PkgA again)
@@ -194,7 +195,7 @@ class TestCircularReferenceDetection:
 
 class TestMaxRecursionDepth:
     def test_deep_nesting_stops_at_limit(self, tmp_path):
-        from as_docs.config import Config, ScannerConfig, ProjectConfig
+        from as_docs.config import Config, ProjectConfig, ScannerConfig
         from as_docs.scanner.project_scanner import scan_project
 
         # Build 12 levels of nesting (exceeds default limit of 10)

@@ -29,17 +29,13 @@ def _dummy_graph() -> KnowledgeGraph:
         edges=[],
         flow_diagrams={},
     )
-    setattr(
-        graph,
-        "_regen_meta",
-        {
-            "scope": "pou:MainProgram",
-            "touched_pous": ["MainProgram"],
-            "elapsed_seconds": 0.123,
-            "scanned_pous": 2,
-            "fallback_full": False,
-        },
-    )
+    graph._regen_meta = {
+        "scope": "pou:MainProgram",
+        "touched_pous": ["MainProgram"],
+        "elapsed_seconds": 0.123,
+        "scanned_pous": 2,
+        "fallback_full": False,
+    }
     return graph
 
 

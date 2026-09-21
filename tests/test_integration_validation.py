@@ -13,10 +13,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-from as_docs.cli import cli, generate, as_cli_check
-from as_docs.config import Config, AsCliConfig
+from as_docs.cli import as_cli_check, cli, generate
+from as_docs.config import AsCliConfig, Config
 from as_docs.scanner.as_cli_adapter import AsCliAdapter, AsCliError
-
 
 # ============================================================================
 # Edge Case Tests
@@ -118,8 +117,8 @@ class TestAsCliEnabledDisabledScenarios:
 
     def test_generate_respects_as_cli_config_disabled(self):
         """When as_cli.enabled=false, engine should not use as-cli."""
-        from as_docs.engine import _should_use_as_cli
         from as_docs.config import AsCliConfig
+        from as_docs.engine import _should_use_as_cli
 
         cfg = MagicMock()
         cfg.as_cli = AsCliConfig(enabled=False)
@@ -131,8 +130,8 @@ class TestAsCliEnabledDisabledScenarios:
 
     def test_generate_respects_as_cli_config_enabled(self):
         """When as_cli.enabled=true, engine should use as-cli."""
-        from as_docs.engine import _should_use_as_cli
         from as_docs.config import AsCliConfig
+        from as_docs.engine import _should_use_as_cli
 
         cfg = MagicMock()
         cfg.as_cli = AsCliConfig(enabled=True)
@@ -144,8 +143,8 @@ class TestAsCliEnabledDisabledScenarios:
 
     def test_cli_flag_overrides_config_disabled(self):
         """CLI flag should override config when config is disabled."""
-        from as_docs.engine import _should_use_as_cli
         from as_docs.config import AsCliConfig
+        from as_docs.engine import _should_use_as_cli
 
         cfg = AsCliConfig(enabled=False)
         use_flag = True  # CLI flag set to True
@@ -156,8 +155,8 @@ class TestAsCliEnabledDisabledScenarios:
 
     def test_cli_flag_overrides_config_enabled(self):
         """CLI flag can disable as-cli even if config enables it."""
-        from as_docs.engine import _should_use_as_cli
         from as_docs.config import AsCliConfig
+        from as_docs.engine import _should_use_as_cli
 
         cfg = AsCliConfig(enabled=True)
         use_flag = False  # CLI flag explicitly set to False
